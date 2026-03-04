@@ -239,7 +239,7 @@ STEP 1 — Read service documentation
          4. GEMINI.md / gemini.md
          5. Any .md file at repo root or one level deep
        Rules:
-         - Skip files over 300 lines (note the skip)
+         - Skip files over 1500 lines (note the skip)
          - Read at most 5 files per service
          - No source code — .md files only
     c. If no relevant files found → invoke map-codebase skill on that repo
