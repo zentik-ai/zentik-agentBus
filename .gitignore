@@ -1,0 +1,7 @@
+# Local smoke-test artifacts
+smoke-fixture/
+smoke-home/
+
+# Python cache files
+__pycache__/
+*.pyc
