@@ -19,6 +19,8 @@ The developer becomes the messenger: relaying context between terminal windows, 
 
 **Goal:** eliminate the developer-as-messenger role during cross-service planning. Each agent arrives at its planning session with full context — without the developer doing any relay work.
 
+Secondary goal: support cross-service discovery questions before planning, so developers can understand an existing multi-service feature without generating plan files.
+
 ---
 
 ## 2. Key Design Decisions
@@ -209,6 +211,7 @@ metadata:
 
 ```
 /agentbus-orchestrator "<feature description>" <service1> <service2> ...
+/agentbus-orchestrator --ask "<question>" <service1> <service2> ...
 ```
 
 Example:
@@ -217,6 +220,11 @@ Example:
 ```
 (`payments`, `notifications`, `crm` are aliases normalized to canonical
 repo names from the registry.)
+
+Ask example:
+```
+/agentbus-orchestrator --ask "how does signup flow across services?" payments notifications crm
+```
 
 #### Protocol
 
@@ -247,20 +255,29 @@ STEP 1 — Read service documentation
     d. Write a one-paragraph internal summary of this service
        before moving to the next one
 
-STEP 2 — Generate plans
-  For each service, generate a plan document (see Plan Format below).
-  Plans must be coherent with each other:
-    - Shared contracts and events should be consistent across plans
-    - If service A produces a Kafka event, service B's plan should consume it
+STEP 2 — Branch by mode
+  Ask mode (`--ask`):
+    - Use gathered docs to answer the user's question.
+    - Return:
+      - direct answer
+      - per-service evidence summary
+      - ambiguities / missing data
+      - suggested follow-up questions
+    - Do not write plan files.
+  Plan mode (default):
+    - For each service, generate a plan document (see Plan Format below).
+    - Plans must be coherent with each other:
+      - Shared contracts and events should be consistent across plans
+      - If service A produces a Kafka event, service B's plan should consume it
 
-STEP 3 — Write plans
+STEP 3 — Write plans (plan mode only)
   For each service:
     uv run <abs-path>/write_plan.py <service-path> <feature-slug> <plan-file>
 
 STEP 4 — Done
   Report to the developer:
-    - Which services received a plan
-    - Plan file paths
+    - In ask mode: that no files were written
+    - In plan mode: which services received a plan and plan file paths
     - Any services skipped and why
     - Run ID and per-service result (written/skipped/failed)
 ```
@@ -532,6 +549,15 @@ Then: new file is named `003-<feature-slug>.md`.
 Given: orchestrator installed globally for Claude Code, expert installed in a project for Gemini CLI.
 When: each CLI is used in its respective context.
 Then: both skills work identically — same scripts, same file format, same protocol.
+
+### Scenario 7 — Orchestrator ask mode (no write)
+
+Given: three services registered and each has at least one relevant `.md` doc.
+When: developer runs `/agentbus-orchestrator --ask "how does onboarding currently work?" payments notifications crm`.
+Then:
+- Orchestrator reads docs across the requested services
+- Returns a cross-service answer with explicit unknowns
+- No `.agentbus-plans/` files are created or modified
 
 ---
 
