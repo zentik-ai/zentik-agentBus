@@ -2,9 +2,10 @@
 
 Cross-service planning skills for LLM coding agents.
 
-This project removes the "developer as messenger" problem when planning
-features that touch multiple repos. The orchestrator writes a draft plan into
-each service repo, and each service expert refines it locally.
+This project removes the "developer as messenger" problem when understanding
+and planning features that touch multiple repos. The orchestrator can answer
+cross-service questions from docs first, then write a draft plan into each
+service repo when you are ready.
 
 ## Current design decisions
 
@@ -66,19 +67,25 @@ uv run scripts/register_service.py crm-service /path/to/crm-service
 
 ## Typical flow
 
-1. Run orchestrator (can use aliases in invocation):
+1. Discover first (optional, no file writes):
+
+```bash
+/agentbus-orchestrator --ask "how does onboarding move across services today?" payments notifications crm
+```
+
+2. Run orchestrator in plan mode (can use aliases in invocation):
 
 ```bash
 /agentbus-orchestrator "migrate sync calls to Kafka events" payments notifications crm
 ```
 
-2. Open each service repo and run:
+3. Open each service repo and run:
 
 ```bash
 /agentbus-expert
 ```
 
-3. Plans are stored in each repo under:
+4. Plans are stored in each repo under:
 
 `<service-repo>/.agentbus-plans/<NNN>-<feature-slug>.md`
 
