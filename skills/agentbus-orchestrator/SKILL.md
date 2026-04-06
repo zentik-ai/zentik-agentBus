@@ -1,6 +1,6 @@
 ---
 name: agentbus-orchestrator
-description: Orchestrate cross-service planning by reading docs across registered service repos and writing a tailored draft plan into each service's .agentbus-plans directory. Use when a feature spans multiple services.
+description: Orchestrate cross-service planning by reading docs across registered service repos. Supports ask mode for cross-service Q&A and plan mode to write tailored draft plans into each service's .agentbus-plans directory.
 compatibility: Requires uv and local filesystem read/write access to registered repositories.
 metadata:
   invocation: manual-only
@@ -8,14 +8,18 @@ metadata:
 
 # agentbus-orchestrator
 
-Use this skill for cross-service planning sessions.
+Use this skill for cross-service discovery and planning sessions.
 
 ## Invocation
 
+Plan mode:
 `/agentbus-orchestrator "<feature description>" <service1> <service2> ...`
 
-Aliases such as `payments`, `notifications`, and `crm` may be provided by the user,
-but they must be normalized to canonical service names from the registry (repo names).
+Ask mode (no plan files written):
+`/agentbus-orchestrator --ask "<question>" <service1> <service2> ...`
+
+Aliases such as `payments`, `notifications`, and `crm` may be provided by the user, but
+they must be normalized to canonical service names from the registry (repo names).
 
 ## Protocol
 
@@ -32,13 +36,24 @@ but they must be normalized to canonical service names from the registry (repo n
    - Other `.md` files at repo root or one level deep
 6. Read only markdown docs, max 5 files per service, skip files over 300 lines.
 7. If no suitable docs exist, invoke `map-codebase` and use generated `AGENTS.md`.
-8. Generate one coherent draft plan per service.
-9. Write each plan with:
-   `uv run <SCRIPTS_DIR>/write_plan.py <service-path> <feature-slug> <plan-content-file>`
-10. Report:
-   - plan file paths created
+8. Branch by mode:
+   - **Ask mode (`--ask`)**:
+     - Do not write plan files.
+     - Answer the question using cross-service context from docs.
+     - Include:
+       - direct answer
+       - per-service evidence summary
+       - ambiguities or missing data
+       - recommended follow-up questions
+   - **Plan mode (default)**:
+     - Generate one coherent draft plan per service.
+     - Write each plan with:
+       `uv run <SCRIPTS_DIR>/write_plan.py <service-path> <feature-slug> <plan-content-file>`
+9. Report:
+   - if plan mode: plan file paths created
+   - if ask mode: explicit confirmation that no files were written
    - skipped services and reasons
-   - suggested next step: run `/agentbus-expert` in each service repo
+   - suggested next step
 
 ## Plan format
 
