@@ -24,10 +24,12 @@ agentbus-skills/
 │   ├── list_services.py
 │   ├── next_plan_number.py
 │   ├── write_plan.py
-│   └── read_plan.py
+│   ├── read_plan.py
+│   └── review_plans.py
 └── skills/
     ├── agentbus-orchestrator/
     ├── agentbus-expert/
+    ├── agentbus-review/
     └── map-codebase/
 ```
 
@@ -88,6 +90,18 @@ uv run scripts/register_service.py crm-service /path/to/crm-service
 4. Plans are stored in each repo under:
 
 `<service-repo>/.agentbus-plans/<NNN>-<feature-slug>.md`
+
+5. Run review gate before implementation:
+
+```bash
+/agentbus-review --feature-slug "kafka-migration"
+```
+
+Or for selected services:
+
+```bash
+/agentbus-review --feature-slug "kafka-migration" --services payments notifications
+```
 
 ## Notes
 
