@@ -235,6 +235,8 @@ You are coordinating a cross-service planning session. Your job is to read each
 service's documentation and write a tailored plan into each repo so that every
 coding agent can start its own planning session with full context.
 
+This skill also supports a discovery mode for Q&A without file writes.
+
 ## Prerequisites
 
 Before anything else, verify that `uv` is available:
@@ -286,7 +288,12 @@ as your documentation input for that service.
 
 ## Step 2 — Generate plans
 
-For each service, generate a plan document using this exact format:
+Branch by mode:
+
+- Ask mode (`--ask "<question>"`): answer the question with evidence per service,
+  list ambiguities, and do not write plan files.
+- Plan mode (default): for each service, generate a plan document using this
+  exact format:
 
 ```markdown
 # Plan: <feature description>
@@ -328,7 +335,7 @@ service B's plan must consume it with matching event names and payloads.
 
 ## Step 3 — Write plans
 
-For each service, save the generated plan to a temp file, then write it:
+Plan mode only. For each service, save the generated plan to a temp file, then write it:
 
 ```bash
 uv run /absolute/path/to/agentbus-skills/scripts/write_plan.py <service-path> <feature-slug> /tmp/plan_<service>.md
@@ -339,7 +346,8 @@ uv run /absolute/path/to/agentbus-skills/scripts/write_plan.py <service-path> <f
 ## Step 4 — Report
 
 Tell the developer:
-- Which services received a plan and the full file path of each
+- In ask mode: explicit statement that no plan files were written
+- In plan mode: which services received a plan and the full file path of each
 - Any services that were skipped and why
 - Whether `map-codebase` was triggered for any service
 - Suggested next step: open each service CLI and run `/agentbus-expert`
@@ -547,11 +555,17 @@ local knowledge.
 
 2. Run the orchestrator from any CLI:
    ```bash
+   /agentbus-orchestrator --ask "how does onboarding work across services?" payments notifications
+   ```
+   (discovery mode, no writes)
+
+3. Run plan mode from any CLI:
+   ```bash
    /agentbus-orchestrator "migrate to Kafka events" payments notifications
    ```
    (`payments` and `notifications` are aliases to canonical repo names)
 
-3. Open each service's CLI and refine the plan:
+4. Open each service's CLI and refine the plan:
    ```bash
    /agentbus-expert
    ```
