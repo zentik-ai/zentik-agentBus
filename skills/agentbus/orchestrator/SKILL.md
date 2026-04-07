@@ -1,5 +1,5 @@
 ---
-name: agentbus/orchestrator
+name: agentbus-orchestrator
 description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow.
 version: 1.0.0
 triggers: [agentbus plan, cross-service feature, multi-service orchestration]
@@ -15,7 +15,7 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 ## Skill Base vs Orchestrator
 
-| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (este archivo) |
+| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (`agentbus-orchestrator/SKILL.md`) |
 |---|---|---|
 | **Propósito** | Router/documentador. Decide si tu caso aplica para AgentBus. | Protocolo completo de ejecución. |
 | **Contenido** | Qué es, cuándo usar, comandos clave. | Waves, spawn de subagentes, manejo de errores. |
