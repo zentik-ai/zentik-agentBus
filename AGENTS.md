@@ -17,13 +17,14 @@ Cross-service planning system for LLM coding agents. Eliminates the "developer a
 
 ## Architecture
 
-### Three-Wave Execution Model
+### Four-Wave Execution Model
 
 ```
-Wave 1: Service Mapping     →  AGENTS.md per service
-Wave 2: Plan Refinement     →  PLAN.md per service
-Wave 3: Verification        →  REPORT.md per service
-Final:  Global synthesis    →  Consolidated views
+Wave 1: Service Mapping    →  AGENTS.md per service
+Wave 2: Plan Refinement    →  PLAN.md per service
+Wave 3: Implementation     →  Code modified + COMMITS.md ⚠️ DESTRUCTIVE
+Wave 4: Verification       →  TEST-RESULTS.md per service
+Final:  Global synthesis   →  Deploy order
 ```
 
 ### Components

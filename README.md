@@ -9,10 +9,10 @@ This project removes the "developer as messenger" problem when understanding and
 Instead of accumulating state in memory, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1: Service Mapping    →  AGENTS.md in each service
-Wave 2: Plan Refinement    →  PLAN.md in each service  
-Wave 3: Verification       →  REPORT.md in each service
-Final:   Orchestrator reads REPORTs → Global view
+Wave 1: Service Mapping    →  AGENTS.md (understand service)
+Wave 2: Plan Refinement    →  PLAN.md (plan the change)
+Wave 3: Implementation     →  Code + COMMITS.md ⚠️ DESTRUCTIVE
+Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
 ```
 
 Benefits:
@@ -67,7 +67,8 @@ workspace/
 │   ├── AGENTS.md                 # Written by Wave 1
 │   └── .agentbus-plans/
 │       ├── 001-feature-slug.md         # Written by Wave 2
-│       └── 001-feature-slug-REPORT.md  # Written by Wave 3
+│       ├── 001-feature-slug-COMMITS.md # Written by Wave 3
+│       └── 001-feature-slug-TEST-RESULTS.md  # Written by Wave 4
 │
 └── notifications-service/
     └── ... (same structure)

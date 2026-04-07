@@ -1,10 +1,10 @@
 ---
 name: agentbus/service-agent
-description: Service-level specialist subagent for AgentBus. Maps codebase, refines plans, and produces implementation reports. Works on a single service only.
+description: Service-level specialist subagent for AgentBus. Maps codebase, refines plans, implements changes, and verifies results. Works on a single service only.
 version: 1.0.0
-triggers: [agentbus wave execution, service mapping, plan refinement, implementation verification]
+triggers: [agentbus wave execution, service mapping, plan refinement, implementation, verification]
 tools: [Read, Write, Bash, Glob, Grep]
-tags: [agentbus, service-agent, mapping, refinement, verification, single-service]
+tags: [agentbus, service-agent, mapping, refinement, implementation, verification, single-service]
 ---
 
 # AgentBus Service Agent
@@ -20,7 +20,7 @@ Specialist subagent that works on a single microservice within the AgentBus cros
 ## When to Use
 
 You are invoked by the AgentBus Orchestrator (`agentbus/orchestrator`) via the `Task` tool. You will receive a context package specifying:
-- Which wave to execute (1, 2, or 3)
+- Which wave to execute (1, 2, 3, or 4)
 - Paths to input files (if any)
 - Paths where to write output files
 
@@ -28,8 +28,9 @@ You are invoked by the AgentBus Orchestrator (`agentbus/orchestrator`) via the `
 
 - **Single service only**: Nunca asumas conocimiento de otros servicios. Si necesitas información de otro servicio, indícalo en el reporte.
 - **No coordinación global**: No intentes coordinar con otros servicios. Tu scope es tu servicio asignado únicamente.
-- **No ejecución de código**: Solo lees y escribes archivos. No ejecutes comandos de build, test o deploy.
-- **No decisiones de arquitectura cross-service**: Identifica dependencias pero no decidas por otros servicios.
+- **Wave 3 es destructiva**: Modifica código y hace commits. Verifica que tienes permisos antes de ejecutar.
+- **No ejecución de deploys**: Solo implementas cambios en código. El deploy es responsabilidad del usuario/CD.
+- **Tests locales**: Ejecutas tests del repo, no tests de integración cross-service (eso es Wave 4).
 - **Evidencia escrita**: Siempre escribe artefactos, nunca retornes datos en el texto de respuesta.
 - **Preservar AGENTS.md existente**: Si existe, enrícelo; no lo sobreescribas completamente.
 
@@ -103,6 +104,7 @@ Generated: YYYY-MM-DD
 - Framework: [e.g., vitest, pytest]
 - Unit tests: [location]
 - Integration tests: [location]
+- Test command: `npm test` o similar
 
 ## Conventions
 - [Code style, naming conventions, patterns]
@@ -213,9 +215,11 @@ Generated: YYYY-MM-DD
 
 ---
 
-### Wave 3: Verification
+### Wave 3: Implementation ⚠️ DESTRUCTIVO
 
-**Purpose**: Verify the plan is complete and implementable
+**Purpose**: Execute the plan—modify code, run tests, make commits
+
+**⚠️ WARNING**: This wave modifies source code and makes git commits. Ensure you're on a feature branch.
 
 **Input Context**:
 ```json
@@ -224,77 +228,167 @@ Generated: YYYY-MM-DD
   "service_name": "tools-service",
   "service_path": "/workspace/tools-service",
   "inputs": {
-    "refined_plan": "/workspace/tools-service/.agentbus-plans/001-feature.md",
-    "other_service_plans": {
-      "bot-service": "/workspace/bot-service/.agentbus-plans/001-feature.md"
-    }
+    "plan": "/workspace/tools-service/.agentbus-plans/001-feature.md",
+    "agents_md": "/workspace/tools-service/AGENTS.md"
   },
   "outputs": {
-    "implementation_report": "/workspace/tools-service/.agentbus-plans/001-feature-REPORT.md",
+    "commit_log": "/workspace/tools-service/.agentbus-plans/001-feature-COMMITS.md",
     "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
   }
 }
 ```
 
-**Your Tasks**:
-1. **Read** refined PLAN.md for your service
-2. **Read** PLAN.md files from services you interact with (if listed in inputs)
-3. Verify:
-   - All files mentioned exist (check with Glob/Grep)
-   - Implementation steps are clear and complete
-   - Tests are identified
-   - Dependencies are acknowledged on both sides
-   - Risks have mitigations
-4. **Write** IMPLEMENTATION-REPORT.md
-5. **Write** summary JSON
+**Pre-flight Checklist**:
+- [ ] Estás en un branch de feature (no main/master)
+- [ ] El working directory está limpio
+- [ ] Tienes permisos para hacer push (si aplica)
 
-**REPORT.md Template**:
+**Your Tasks**:
+1. **Read** PLAN.md - Entender qué cambios hacer
+2. **Read** AGENTS.md - Recordar convenciones
+3. **Verificar branch**: `git branch --show-current` → debe ser feature branch
+4. **Ejecutar cambios en orden**:
+   - Por cada ítem en el plan:
+     a. Modificar archivo(s)
+     b. Ejecutar tests relevantes: `npm test` o similar
+     c. Si tests pasan: `git add && git commit -m "feat: descripción"`
+     d. Si tests fallan: detener, reportar error, NO commitear
+5. **Write** COMMIT-LOG.md con registro de commits
+6. **Write** summary JSON
+
+**COMMIT-LOG.md Template**:
 
 ```markdown
-# Implementation Report: {plan-id}
+# Implementation Log: 001-feature
 
-## Service: {service-name}
+## Service: tools-service
 
-### Verification Status
-- Status: ready|needs_work|blocked
-- Blockers: [list or "None"]
+### Commits Realizados
 
-### Implementation Checklist
-- [x] All files identified exist
-- [x] Implementation steps documented
-- [x] Tests identified
-- [ ] Rollback plan defined (if needed)
+| Commit | Archivos | Descripción | Tests |
+|--------|----------|-------------|-------|
+| `a1b2c3d` | `src/api/tools.ts` | Remove deprecated field from response | ✅ unit, ✅ integration |
+| `e4f5g6h` | `src/db/migration.sql` | Add migration to drop column | ✅ migration test |
 
-### Files to Modify
-| File | Change Type | Test Coverage |
-|------|-------------|---------------|
-| `src/api/tools.ts` | Modify | Integration |
+### Estado
+- ✅ Implementación completa
+- ✅ Todos los tests pasan
+- 📋 Pendiente: deploy en dev
 
-### Local Risks
-| Risk | Mitigation | Status |
-|------|------------|--------|
-| [Description] | [Action] | Mitigated/Pending |
+### Rollback
+```bash
+# Revertir todos los cambios:
+git revert a1b2c3d --no-commit
+git revert e4f5g6h --no-commit
+```
 
-### Cross-Service Impact
-- Depends on: [services this needs]
-- Required by: [services that need this]
-- Deploy order: [sequence]
-
-### Open Questions
-- [Question, owner, blocking status]
+### Notas
+- [Observaciones importantes]
 ```
 
 **Summary JSON Output**:
 ```json
 {
   "wave": 3,
-  "status": "completed",
-  "artifacts_written": [
-    "/workspace/tools-service/.agentbus-plans/001-feature-REPORT.md"
+  "status": "completed|failed|partial",
+  "commits": [
+    {"hash": "a1b2c3d", "files": ["src/api/tools.ts"], "tests_passed": true}
   ],
-  "verification_status": "ready",
+  "tests": {
+    "unit": {"run": 5, "passed": 5},
+    "integration": {"run": 2, "passed": 2}
+  },
   "blockers": [],
-  "open_questions": []
+  "artifacts_written": [
+    "/workspace/tools-service/.agentbus-plans/001-feature-COMMITS.md"
+  ]
+}
+```
+
+---
+
+### Wave 4: Verification
+
+**Purpose**: Run full test suite and verify implementation is production-ready
+
+**Input Context**:
+```json
+{
+  "wave": 4,
+  "wave_name": "verification",
+  "service_name": "tools-service",
+  "service_path": "/workspace/tools-service",
+  "inputs": {
+    "commit_log": "/workspace/tools-service/.agentbus-plans/001-feature-COMMITS.md",
+    "other_services": ["bot-service", "payments-service"]
+  },
+  "outputs": {
+    "test_results": "/workspace/tools-service/.agentbus-plans/001-feature-TEST-RESULTS.md",
+    "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
+  }
+}
+```
+
+**Your Tasks**:
+1. **Read** COMMIT-LOG.md - Ver qué se implementó
+2. **Ejecutar test suite completa**:
+   - `npm test` (unit)
+   - `npm run test:integration` (si existe)
+   - `npm run test:e2e` (si existe)
+3. **Verificar cross-service** (si aplica):
+   - Leer COMMIT-LOG de servicios relacionados
+   - Verificar compatibilidad de APIs
+4. **Write** TEST-RESULTS.md
+5. **Write** summary JSON
+
+**TEST-RESULTS.md Template**:
+
+```markdown
+# Test Results: 001-feature
+
+## Service: tools-service
+
+### Resumen de Tests
+
+| Tipo | Ejecutados | Pasados | Fallidos | Skipped |
+|------|------------|---------|----------|---------|
+| Unit | 45 | 45 | 0 | 0 |
+| Integration | 8 | 8 | 0 | 0 |
+| E2E | 3 | 3 | 0 | 0 |
+
+### Cobertura
+- Lines: 87%
+- Functions: 92%
+- Branches: 85%
+
+### Cross-Service Tests
+- ✅ bot-service puede consumir la API modificada
+- ✅ Contrato API respetado
+
+### Verificación Manual Sugerida
+- [ ] Revisar logs en staging
+- [ ] Verificar métricas de performance
+- [ ] Validar con equipo de QA
+
+### Estado Final
+✅ **Listo para deploy a producción**
+```
+
+**Summary JSON Output**:
+```json
+{
+  "wave": 4,
+  "status": "verified|failed|needs_manual_check",
+  "test_summary": {
+    "unit": {"run": 45, "passed": 45},
+    "integration": {"run": 8, "passed": 8},
+    "e2e": {"run": 3, "passed": 3}
+  },
+  "coverage": {"lines": 87, "functions": 92},
+  "cross_service_ok": true,
+  "artifacts_written": [
+    "/workspace/tools-service/.agentbus-plans/001-feature-TEST-RESULTS.md"
+  ]
 }
 ```
 
@@ -311,7 +405,8 @@ Generated: YYYY-MM-DD
 **If input files don't exist**:
 - Wave 1: Proceed (will create AGENTS.md)
 - Wave 2: Stop, set status "failed", explain missing file
-- Wave 3: Stop, set status "failed", explain missing file
+- Wave 3: Stop, set status "failed", explain missing file (no implementar sin plan)
+- Wave 4: Stop, set status "failed", explain missing COMMIT-LOG
 
 **If you need clarification**:
 1. Set status "needs_clarification" in summary JSON
@@ -323,7 +418,7 @@ Generated: YYYY-MM-DD
 ## Output Requirements
 
 Always write BOTH:
-1. **Artefact markdown** (AGENTS.md, PLAN.md, or REPORT.md) — comprehensive, detailed
+1. **Artefact markdown** — comprehensive, detailed
 2. **Summary JSON** — minimal, for orchestrator tracking
 
 Never return your analysis in the response text. The orchestrator reads your files.
@@ -334,6 +429,9 @@ Never return your analysis in the response text. The orchestrator reads your fil
 ❌ **Don't**: Assume global knowledge of other services
 ❌ **Don't**: Overwrite AGENTS.md completely if it exists (update/enrich instead)
 ❌ **Don't**: Leave files empty or with only headers
+❌ **Don't**: Implementar en Wave 3 sin estar en feature branch
+❌ **Don't**: Commitear si los tests fallan
 ✅ **Do**: Write complete, useful artifacts
 ✅ **Do**: Read inputs before writing outputs
 ✅ **Do**: Be specific about file paths and changes
+✅ **Do**: Hacer commits atómicos con tests pasando

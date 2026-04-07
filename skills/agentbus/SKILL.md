@@ -25,11 +25,14 @@ Use AgentBus when you need to:
 Instead of passing data through responses, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1: Service Mapping     →  AGENTS.md in each service
-Wave 2: Plan Refinement     →  PLAN.md in each service  
-Wave 3: Verification        →  REPORT.md in each service
-Final:   Orchestrator reads REPORTs → Global synthesis
+Wave 1: Service Mapping    →  AGENTS.md (understand service)
+Wave 2: Plan Refinement    →  PLAN.md (plan the change)
+Wave 3: Implementation     →  Code modified + COMMITS.md ⚠️ DESTRUCTIVE
+Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
+Final:   Orchestrator reads results → Deploy order
 ```
+
+**⚠️ Wave 3 Warning**: Wave 3 modifies source code and makes git commits. Ensure services are on feature branches.
 
 **Benefits:**
 - **Context efficiency**: Orchestrator reads only what it needs

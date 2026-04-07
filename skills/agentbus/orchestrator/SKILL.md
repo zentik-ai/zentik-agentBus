@@ -18,10 +18,13 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 **Files are the source of truth.** You don't accumulate state—you read artifacts when you need to know the status.
 
 ```
-Wave 1: Subagents write AGENTS.md ← You read summaries
-Wave 2: Subagents write PLAN.md ← You read summaries
-Wave 3: Subagents write REPORT.md ← You read reports for global verification
+Wave 1: Subagents write AGENTS.md       ← Mapping (understand service)
+Wave 2: Subagents write PLAN.md         ← Refinement (plan the change)
+Wave 3: Subagents modify code + commits ← Implementation (execute plan) ⚠️ DESTRUCTIVE
+Wave 4: Subagents run tests             ← Verification (verify it works)
 ```
+
+**⚠️ Wave 3 Warning**: Wave 3 modifies source code and makes git commits. Ensure services are on feature branches before running.
 
 ## When to Use
 
@@ -34,7 +37,8 @@ Or: `/agentbus-orchestrator --continue 001-feature` (resume from status.json)
 - **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus/service-agent`.
 - **No acumula estado en contexto**: Debe leer artefactos, no mantener estado en memoria.
 - **Requiere `agentbus/service-agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
-- **No modifica código de servicios**: Solo lee y escribe archivos de planificación.
+- **Wave 3 modifica código**: Asegúrate de que los servicios estén en feature branches antes de ejecutar Wave 3.
+- **Confirma Wave 3 con usuario**: Wave 3 es destructiva. Pide confirmación explícita antes de ejecutar.
 - **No toma decisiones de arquitectura**: Presenta opciones, el usuario decide.
 
 ## Execution Model: Sequential Waves, Parallel Services
@@ -44,7 +48,9 @@ Wave 1 (Mapping)
   └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
 Wave 2 (Refinement)
   └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
-Wave 3 (Verification)
+Wave 3 (Implementation) ⚠️ DESTRUCTIVE
+  └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
+Wave 4 (Verification)
   └─► Spawn N subagents in parallel ──► Wait ──► Read reports ──► Global verify
 ```
 
@@ -95,7 +101,8 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
      "waves": {
        "wave_1_mapping": {"status": "ready"},
        "wave_2_refinement": {"status": "pending"},
-       "wave_3_verification": {"status": "pending"}
+       "wave_3_implementation": {"status": "pending", "destructive": true},
+       "wave_4_verification": {"status": "pending"}
      }
    }
    ```
@@ -164,58 +171,84 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
 
 17. **Report**: Summary of plans refined
 
-### Phase 5: Wave 3 — Verification
+### Phase 5: Wave 3 — Implementation ⚠️ DESTRUCTIVE
 
-18. **Check status.json**: Verify wave 2 is "completed"
+18. **⚠️ CONFIRM WITH USER BEFORE PROCEEDING**:
+    - Warn: "Wave 3 will modify source code and make git commits."
+    - Verify: "Ensure all services are on feature branches, not main/master."
+    - Ask: "¿Proceder con Wave 3? (yes/no)"
 
-19. **Launch parallel subagents**:
+19. **Check status.json**: Verify wave 2 is "completed"
+
+20. **Launch parallel subagents**:
     ```python
-    # Build map of other service plans for cross-reference
-    other_plans = {s: f"/workspace/{s}/.agentbus-plans/{plan_id}.md" for s in services if s != current}
-    
     Task(
         subagent_name="agentbus/service-agent",
-        description=f"Wave 3: Verify {service}",
+        description=f"Wave 3: Implement changes for {service}",
         prompt=json.dumps({
             "wave": 3,
             "service_name": service,
             "service_path": f"/workspace/{service}",
             "inputs": {
-                "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}.md",
-                "other_service_plans": other_plans
+                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}.md",
+                "agents_md": f"/workspace/{service}/AGENTS.md"
             },
             "outputs": {
-                "implementation_report": f"/workspace/{service}/.agentbus-plans/{plan_id}-REPORT.md",
+                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
         })
     )
     ```
 
-20. **Wait**, **read** summaries
+21. **Wait**, **read** summaries, **update** status.json
 
-21. **Read** all IMPLEMENTATION-REPORT.md files for global verification
+22. **Report**: Summary of commits made per service
 
-22. **Run Global Verification**:
-    - Plan completeness: All services have REPORT.md
-    - Dependency mirroring: If A depends on B, both acknowledge
-    - Contract consistency: API changes documented on both sides
-    - Question ownership: Every open question has an owner
-    - Sequencing coherence: Deploy order is logical
+### Phase 6: Wave 4 — Verification
 
-23. **Write Final Artifacts**:
-    - `PLAN.md` — Synthesis of all service plans
-    - `TEST-PLAN.md` — Cross-service integration tests
-    - `DEPLOY-ORDER.md` — Rollout sequence
+23. **Check status.json**: Verify wave 3 is "completed"
 
-24. **Update status.json**: Mark as "completed"
+24. **Launch parallel subagents**:
+    ```python
+    Task(
+        subagent_name="agentbus/service-agent",
+        description=f"Wave 4: Verify implementation for {service}",
+        prompt=json.dumps({
+            "wave": 4,
+            "service_name": service,
+            "service_path": f"/workspace/{service}",
+            "inputs": {
+                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
+                "other_services": [s for s in services if s != service]
+            },
+            "outputs": {
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}-TEST-RESULTS.md",
+                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+            }
+        })
+    )
+    ```
 
-25. **Final Report**:
-    - Readiness status
-    - Key decisions
-    - Risks
-    - Unresolved items with owners
-    - Recommended next step
+25. **Wait**, **read** summaries
+
+26. **Read** all TEST-RESULTS.md files for global verification
+
+27. **Run Global Verification**:
+    - All services pass tests
+    - Cross-service dependencies work
+    - API contracts are respected
+
+28. **Write Final Artifacts**:
+    - `DEPLOY-ORDER.md` — Rollout sequence with verified commits
+
+29. **Update status.json**: Mark as "completed"
+
+30. **Final Report**:
+    - Implementation status per service
+    - Test results summary
+    - Deploy readiness
+    - Recommended next step: deploy to staging/production
 
 ## Error Handling & Retries
 
