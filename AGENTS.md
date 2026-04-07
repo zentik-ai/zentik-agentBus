@@ -4,97 +4,144 @@ Generated: 2026-04-06
 
 ## Project Overview
 
-Cross-service planning system for LLM coding agents. Eliminates the "developer as messenger" problem when planning features that span multiple microservices.
+AgentBus Skills is a **cross-service planning system for LLM coding agents**. It eliminates the "developer as messenger" problem when planning features that span multiple microservices.
 
 **Core Principle**: Evidence over communication. Files are the source of truth.
 
+The system uses an **evidence-based workflow** where artifacts are written at each stage instead of accumulating state in memory:
+
+```
+Wave 1: Service Mapping    →  AGENTS.md per service
+Wave 2: Plan Refinement    →  PLAN.md per service  
+Wave 3: Implementation     →  Code modified (no commits yet)
+Wave 4: Verification       →  TEST-RESULTS.md per service
+Wave 5: Wrap-up (optional) →  Git commits + deployment prep
+```
+
+**Benefits**:
+- **Context efficiency**: Orchestrator reads only what it needs
+- **Auditability**: Complete history in version-controlled files
+- **Resumability**: Failed waves can be retried independently
+- **Reusability**: AGENTS.md serves as living service documentation
+
+---
+
 ## Technology Stack
 
-- **Language**: Markdown (SKILL.md files)
-- **Orchestration**: Skill-based via `Task` tool
-- **State Management**: File-based (JSON + Markdown)
-- **Subagents**: Spawned via `Task` tool for parallel execution
+| Component | Technology |
+|-----------|------------|
+| **Language** | Markdown (SKILL.md files with YAML frontmatter) |
+| **Orchestration** | Skill-based via `Task` tool |
+| **State Management** | File-based (JSON + Markdown) |
+| **Subagents** | Spawned via `Task` tool for parallel execution |
+| **Dependencies** | None for core orchestration |
+
+---
 
 ## Architecture
 
 ### Five-Wave Execution Model
 
-```
-Wave 1: Service Mapping    →  AGENTS.md per service
-Wave 2: Plan Refinement    →  PLAN.md per service
-Wave 3: Implementation     →  Code modified + CHANGES.md (no commits)
-Wave 4: Verification       →  TEST-RESULTS.md per service
-Wave 5: Wrap-up (optional) →  COMMITS.md per service
-Final:  Global synthesis   →  Deploy order
-```
+| Wave | Name | Input | Output | Purpose |
+|------|------|-------|--------|---------|
+| 1 | Service Mapping | Service codebase | AGENTS.md | Understand the service |
+| 2 | Plan Refinement | AGENTS.md + requirement | PLAN.md | Plan the change |
+| 3 | Implementation | PLAN.md | Modified code + CHANGES.md | Execute the plan (no commits) |
+| 4 | Verification | Modified code + tests | TEST-RESULTS.md | Verify it works |
+| 5 | Wrap-up | TEST-RESULTS.md | COMMITS.md | Create git commits (optional) |
 
-**Note**: Commits only happen in Wave 5, after successful verification and user confirmation.
-
-### Components
-
-| Component | Purpose | Location |
-|-----------|---------|----------|
-| agentbus (base) | Entry point / router | `skills/agentbus/SKILL.md` |
-| agentbus/orchestrator | Wave coordinator | `skills/agentbus/orchestrator/` |
-| agentbus/service-agent | Maps/refines/verifies per service | `skills/agentbus/service-agent/` |
-| agentbus/review | Consistency checker | `skills/agentbus/review/` |
-| map-codebase | Codebase explorer | `skills/map-codebase/` |
-
-### File Structure
-
-```
-agentbus-skills/
-├── README.md
-├── AGENTS.md                    # This file
-├── agentBus_PRD                 # Product requirements
-├── agentBus_details.md          # Implementation details (Spanish)
-├── refactor_agentbus.md         # Refactor plan
-└── skills/
-    ├── agentbus/                # Skill family
-    │   ├── SKILL.md             # Entry point (base skill)
-    │   ├── orchestrator/        # Subskill
-    │   ├── service-agent/       # Subskill
-    │   └── review/              # Subskill
-    └── map-codebase/            # Independent skill
-```
+**Important**: Commits only happen in Wave 5, after successful verification and user confirmation.
 
 ### Skill Hierarchy
 
 ```
-agentbus (base/router)
-├── agentbus/orchestrator (spawned by base)
+agentbus (base skill - entry point/router)
+├── agentbus/orchestrator (wave coordinator)
 │   └── spawns agentbus/service-agent via Task tool
-└── agentbus/review (called by user)
+└── agentbus/review (consistency checker - called by user)
 ```
 
+| Skill | Purpose | Location | Invocation |
+|-------|---------|----------|------------|
+| **agentbus** | Entry point / router | `skills/agentbus/SKILL.md` | Implicit via subskill |
+| **agentbus/orchestrator** | Coordinates waves, spawns subagents | `skills/agentbus/orchestrator/SKILL.md` | `/agentbus-orchestrator ...` |
+| **agentbus/service-agent** | Per-service specialist | `skills/agentbus/service-agent/SKILL.md` | Via Task tool only |
+| **agentbus/review** | Verifies cross-service consistency | `skills/agentbus/review/SKILL.md` | `/agentbus-review ...` |
+| **map-codebase** | Codebase explorer | `skills/map-codebase/SKILL.md` | Auto-invoked |
+
+---
+
+## Directory Structure
+
+```
+agentbus-skills/
+├── README.md                          # Human-facing documentation
+├── AGENTS.md                          # This file - agent guide
+├── WAVE-3-4-DESIGN.md                 # Design document for Waves 3-4 (Spanish)
+├── .gitignore                         # Git ignore rules
+├── skills/
+│   ├── SKILL.md                       # Skill registry / base skill index
+│   ├── agentbus/                      # AgentBus skill family
+│   │   ├── SKILL.md                   # Base skill (entry point)
+│   │   ├── orchestrator/              # Wave coordinator subskill
+│   │   │   └── SKILL.md
+│   │   ├── service-agent/             # Per-service specialist subskill
+│   │   │   └── SKILL.md
+│   │   └── review/                    # Consistency checker subskill
+│   │       └── SKILL.md
+│   └── map-codebase/                  # Independent codebase explorer
+│       └── SKILL.md
+```
+
+---
+
 ## Key Conventions
+
+### SKILL.md Format
+
+All skills use YAML frontmatter with standard metadata:
+
+```yaml
+---
+name: skill-name
+description: What this skill does
+version: 1.0.0
+triggers: [keyword1, keyword2]
+tools: [Read, Write, Bash, Task]
+tags: [tag1, tag2]
+---
+```
 
 ### Workspace Layout (Runtime)
 
 ```
-workspace/
-├── agentbus-orchestrator/       # Orchestrator state (not a git repo)
-│   └── 001-feature/
-│       ├── status.json          # Wave tracking
-│       ├── SEED-PLAN.md         # Initial vision
-│       ├── PLAN.md              # Consolidated view
-│       └── service-outputs/     # Subagent summaries
+workspace/                          # Parent folder of all repos
+├── agentbus-orchestrator/          # Orchestrator state (NOT a git repo)
+│   └── 001-feature-slug/
+│       ├── status.json             # Wave tracking, resume/retry
+│       ├── SEED-PLAN.md            # Initial vision
+│       ├── PLAN.md                 # Consolidated view (final)
+│       ├── TEST-PLAN.md            # Cross-service tests
+│       ├── DEPLOY-ORDER.md         # Rollout sequence
+│       ├── REVIEW.md               # Consistency review report
+│       └── service-outputs/        # Subagent summaries
+│           └── {service}.json
 │
-├── service-a/                   # Service repo
-│   ├── AGENTS.md               # Written by Wave 1
+├── payments-service/               # Service repo
+│   ├── AGENTS.md                   # ← Wave 1: service documentation
 │   └── .agentbus-plans/
-│       ├── 001-feature.md      # Written by Wave 2
-│       ├── 001-feature-CHANGES.md # Written by Wave 3
-│       ├── 001-feature-TEST-RESULTS.md # Written by Wave 4
-│       └── 001-feature-COMMITS.md # Written by Wave 5 (optional)
+│       ├── 001-feature.md          # ← Wave 2: refined plan
+│       ├── 001-feature-CHANGES.md  # ← Wave 3: implementation log
+│       ├── 001-feature-TEST-RESULTS.md  # ← Wave 4: test results
+│       └── 001-feature-COMMITS.md  # ← Wave 5: commit log (optional)
 │
-└── service-b/
+└── notifications-service/
     └── ... (same structure)
 ```
 
 ### Artifact Chain
 
-1. **AGENTS.md** — Service documentation (stack, arch, APIs, conventions)
+1. **AGENTS.md** — Living service documentation (stack, arch, APIs, conventions)
 2. **PLAN.md** — Refined implementation plan per feature
 3. **CHANGES.md** — List of files modified in Wave 3 (ready for commit)
 4. **TEST-RESULTS.md** — Verification report with test results
@@ -104,36 +151,216 @@ workspace/
 
 `status.json` tracks progress without storing content:
 - Current wave
-- Service statuses
+- Service statuses (pending/ready/completed/failed)
 - Artifact paths (not content)
 - Retry counts
 
-## Testing
+Example status.json:
+```json
+{
+  "plan_id": "001-feature",
+  "feature_slug": "feature",
+  "services": ["svc1", "svc2"],
+  "status": "in_progress",
+  "current_wave": 2,
+  "waves": {
+    "wave_1_mapping": {"status": "completed"},
+    "wave_2_refinement": {"status": "in_progress"},
+    "wave_3_implementation": {"status": "pending"},
+    "wave_4_verification": {"status": "pending"},
+    "wave_5_wrapup": {"status": "pending", "optional": true}
+  }
+}
+```
 
-### Dry-Run Strategy
+---
+
+## Development Workflow
+
+### Typical Usage Flow
+
+1. **Discovery** (optional):
+   ```
+   /agentbus-orchestrator --ask "how does X work across services?" svc1 svc2
+   ```
+
+2. **Initialize Plan**:
+   ```
+   /agentbus-orchestrator "feature description" svc1 svc2
+   ```
+   Creates: `agentbus-orchestrator/001-feature/status.json` + `SEED-PLAN.md`
+
+3. **Wave 1 - Service Mapping**:
+   ```
+   /agentbus-orchestrator --continue 001-feature
+   ```
+   Creates/updates: `{service}/AGENTS.md`
+
+4. **Wave 2 - Plan Refinement**:
+   ```
+   /agentbus-orchestrator --continue 001-feature
+   ```
+   Creates: `{service}/.agentbus-plans/001-feature.md`
+
+5. **Wave 3 - Implementation**:
+   ```
+   /agentbus-orchestrator --continue 001-feature
+   ```
+   Modifies code, creates: `{service}/.agentbus-plans/001-feature-CHANGES.md`
+
+6. **Wave 4 - Verification**:
+   ```
+   /agentbus-orchestrator --continue 001-feature
+   ```
+   Creates: `{service}/.agentbus-plans/001-feature-TEST-RESULTS.md`
+
+7. **Review**:
+   ```
+   /agentbus-review --feature-slug "001-feature"
+   ```
+   Creates: `agentbus-orchestrator/001-feature/REVIEW.md`
+
+8. **Wave 5 - Wrap-up** (optional, requires user confirmation):
+   ```
+   /agentbus-orchestrator --continue 001-feature
+   ```
+   Creates git commits + `{service}/.agentbus-plans/001-feature-COMMITS.md`
+
+---
+
+## Testing Strategy
+
+### Dry-Run Phases
 
 1. **Phase 1**: Single service, Wave 1 only
-2. **Phase 2**: Single service, all 3 waves
-3. **Phase 3**: Two services, all 3 waves
+2. **Phase 2**: Single service, all waves
+3. **Phase 3**: Two services, all waves
 4. **Phase 4**: Retry and mid-flight service addition
 
 ### Success Criteria
 
 - [ ] Wave 1 creates AGENTS.md with complete structure
 - [ ] Wave 2 reads AGENTS.md, writes PLAN.md
-- [ ] Wave 3 reads PLAN.md, writes REPORT.md
-- [ ] Orchestrator reads REPORTs for global verification
+- [ ] Wave 3 modifies code, writes CHANGES.md
+- [ ] Wave 4 runs tests, writes TEST-RESULTS.md
+- [ ] Orchestrator reads reports for global verification
 - [ ] Retry mechanism works (overwrite artifacts)
 - [ ] Resume from status.json works
 
+---
+
+## Error Handling & Recovery
+
+### Subagent Fails
+
+1. Check `status.json` for error details
+2. Fix underlying issue
+3. Re-run: `/agentbus-orchestrator --continue {plan-id}`
+4. Failed subagent re-runs, others unchanged
+
+### Add Service Mid-Flight
+
+1. Update `status.json` to add service
+2. Re-run current wave
+3. Only new service gets processed
+
+### Resume After Interruption
+
+1. Read `status.json` to see current wave
+2. Run: `/agentbus-orchestrator --continue {plan-id}`
+3. Continues from where it left off
+
+---
+
+## Security Considerations
+
+### Wave 3 is Destructive (but no commits)
+
+- Modifies source code files
+- Runs tests
+- Does NOT commit changes
+
+### Wave 5 is Commits (requires confirmation)
+
+- Only runs after explicit user confirmation
+- Creates git commits
+- Should be on feature branch, not main/master
+
+### Best Practices
+
+1. **Confirm with user** before Wave 3 (code modification)
+2. **Confirm with user** before Wave 5 (git commits)
+3. Use **feature branches** to isolate changes
+4. **Working directory** should be clean before starting
+
+---
+
+## Service Registry
+
+Global registry file: `~/.agentbus/services.json`
+
+```json
+{
+  "payments-service": "/home/user/repos/payments-service",
+  "notifications-service": "/home/user/repos/notifications-service"
+}
+```
+
+**To register a service**: Read `~/.agentbus/services.json`, add entry, write back.
+
+**To list services**: Read `~/.agentbus/services.json` and parse.
+
+---
+
+## Language Notes
+
+This project uses **mixed language documentation**:
+- Main documentation (README.md, SKILL.md files): **English**
+- Design documents (WAVE-3-4-DESIGN.md): **Spanish**
+- Code comments: Varies by context
+
+When modifying files, match the language of the existing content.
+
+---
+
 ## External Dependencies
 
-- None for core orchestration
+- **None** for core orchestration
 - `Task` tool (provided by Kimi Code CLI) for subagent spawning
 
-## Notes
+---
 
-- Orchestrator lives at workspace level, not in a service repo
-- Subagents write to their own service repos only
-- No helper scripts required for core flow
-- AGENTS.md persists as living documentation
+## Anti-Patterns to Avoid
+
+❌ **Don't**: Run all waves in one session (context exhaustion)
+✅ **Do**: Run one wave at a time, review, then continue
+
+❌ **Don't**: Modify AGENTS.md manually during planning
+✅ **Do**: Let Wave 1 subagent update it
+
+❌ **Don't**: Skip Wave 4 (verification)
+✅ **Do**: Always verify before committing
+
+❌ **Don't**: Add too many services (>5) without user confirmation
+✅ **Do**: Propose list, let user confirm/adjust
+
+❌ **Don't**: Commit in Wave 3 (only Wave 5)
+✅ **Do**: Leave files modified but uncommitted after Wave 3
+
+---
+
+## Related Files
+
+- `README.md` — Human-facing project overview
+- `WAVE-3-4-DESIGN.md` — Detailed design for implementation and verification waves (Spanish)
+- `skills/agentbus/SKILL.md` — Base skill definition
+- `skills/agentbus/orchestrator/SKILL.md` — Orchestrator protocol
+- `skills/agentbus/service-agent/SKILL.md` — Service agent protocol
+- `skills/agentbus/review/SKILL.md` — Review protocol
+- `skills/map-codebase/SKILL.md` — Codebase exploration skill
+
+---
+
+## Version
+
+AgentBus Skills v1.0.0 — Evidence-Based Wave Model
