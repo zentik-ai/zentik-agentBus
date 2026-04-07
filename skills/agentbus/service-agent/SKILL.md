@@ -144,7 +144,7 @@ Generated: YYYY-MM-DD
     "seed_plan": "/workspace/agentbus-orchestrator/001-feature/SEED-PLAN.md"
   },
   "outputs": {
-    "refined_plan": "/workspace/tools-service/.agentbus-plans/001-feature.md",
+    "refined_plan": "/workspace/tools-service/.agentbus-plans/001-feature/PLAN.md",
     "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
   }
 }
@@ -204,7 +204,7 @@ Generated: YYYY-MM-DD
 {
   "wave": 2,
   "status": "completed",
-  "artifacts_written": ["/workspace/tools-service/.agentbus-plans/001-feature.md"],
+  "artifacts_written": ["/workspace/tools-service/.agentbus-plans/001-feature/PLAN.md"],
   "interface_changes": [
     {"type": "api", "description": "Remove deprecated field"}
   ],
@@ -230,11 +230,11 @@ Generated: YYYY-MM-DD
   "service_name": "tools-service",
   "service_path": "/workspace/tools-service",
   "inputs": {
-    "plan": "/workspace/tools-service/.agentbus-plans/001-feature.md",
+    "plan": "/workspace/tools-service/.agentbus-plans/001-feature/PLAN.md",
     "agents_md": "/workspace/tools-service/AGENTS.md"
   },
   "outputs": {
-    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature-CHANGES.md",
+    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature/CHANGES.md",
     "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
   }
 }
@@ -314,7 +314,7 @@ git checkout -- src/api/tools.ts src/db/migration.sql
   "blockers": [],
   "ready_for_commit": true,
   "artifacts_written": [
-    "/workspace/tools-service/.agentbus-plans/001-feature-CHANGES.md"
+    "/workspace/tools-service/.agentbus-plans/001-feature/CHANGES.md"
   ]
 }
 ```
@@ -332,11 +332,11 @@ git checkout -- src/api/tools.ts src/db/migration.sql
   "service_name": "tools-service",
   "service_path": "/workspace/tools-service",
   "inputs": {
-    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature-CHANGES.md",
+    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature/CHANGES.md",
     "other_services": ["bot-service", "payments-service"]
   },
   "outputs": {
-    "test_results": "/workspace/tools-service/.agentbus-plans/001-feature-TEST-RESULTS.md",
+    "test_results": "/workspace/tools-service/.agentbus-plans/001-feature/TEST-RESULTS.md",
     "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
   }
 }
@@ -400,7 +400,7 @@ git checkout -- src/api/tools.ts src/db/migration.sql
   "coverage": {"lines": 87, "functions": 92},
   "cross_service_ok": true,
   "artifacts_written": [
-    "/workspace/tools-service/.agentbus-plans/001-feature-TEST-RESULTS.md"
+    "/workspace/tools-service/.agentbus-plans/001-feature/TEST-RESULTS.md"
   ]
 }
 ```
@@ -420,11 +420,11 @@ git checkout -- src/api/tools.ts src/db/migration.sql
   "service_name": "tools-service",
   "service_path": "/workspace/tools-service",
   "inputs": {
-    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature-CHANGES.md",
-    "test_results": "/workspace/tools-service/.agentbus-plans/001-feature-TEST-RESULTS.md"
+    "changes_log": "/workspace/tools-service/.agentbus-plans/001-feature/CHANGES.md",
+    "test_results": "/workspace/tools-service/.agentbus-plans/001-feature/TEST-RESULTS.md"
   },
   "outputs": {
-    "commit_log": "/workspace/tools-service/.agentbus-plans/001-feature-COMMITS.md",
+    "commit_log": "/workspace/tools-service/.agentbus-plans/001-feature/COMMITS.md",
     "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/tools-service.json"
   }
 }
@@ -487,7 +487,7 @@ git revert a1b2c3d
     {"hash": "a1b2c3d", "message": "feat: remove deprecated field...", "files": [...]}
   ],
   "artifacts_written": [
-    "/workspace/tools-service/.agentbus-plans/001-feature-COMMITS.md"
+    "/workspace/tools-service/.agentbus-plans/001-feature/COMMITS.md"
   ]
 }
 ```

@@ -98,19 +98,27 @@ Ejecuta la siguiente wave basada en `status.json`.
 # Debe contener los servicios que vas a usar
 ```
 
-### 2. Ejecutar Flujo
+### 2. Plan ID Auto-Generado
+El orchestrator escanea `.agentbus-plans/` en cada servicio para:
+- Encontrar el número de plan más alto existente
+- Sugerir el siguiente número secuencial (sin gaps)
+- Validar consistencia entre todos los servicios
+
+Ejemplo: Si existe `003-feature`, el nuevo será `004-nuevo-feature`.
+
+### 3. Ejecutar Flujo
 ```
-# Paso 1: Inicializar
+# Paso 1: Inicializar (auto-detecta número de plan)
 /agentbus-orchestrator "descripción del feature" svc1 svc2
 
 # Paso 2: Wave 1 (Mapping)
-/agentbus-orchestrator --continue 001-feature-slug
+/agentbus-orchestrator --continue 004-feature-slug
 
 # Paso 3: Revisar AGENTS.md generados
 # (Opcional: /agentbus-review --feature-slug ...)
 
 # Paso 4-N: Continuar waves restantes
-/agentbus-orchestrator --continue 001-feature-slug
+/agentbus-orchestrator --continue 004-feature-slug
 ```
 
 ---

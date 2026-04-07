@@ -260,9 +260,66 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
    - Ask user to confirm/adjust
    - Finalize service list
 
-### Phase 2: Initialize Plan
+### Phase 2: Plan ID Generation & Validation
 
-4. **Create orchestrator workspace**:
+Before creating the plan, validate numbering consistency across all services.
+
+**5. Scan existing plans in each service:**
+   ```python
+   def get_next_plan_id(services, registry):
+       """
+       Finds the highest plan number across all services.
+       Returns next plan ID (e.g., '004-feature-name').
+       """
+       max_number = 0
+       all_plans = []
+       
+       for service in services:
+           service_path = registry[service]
+           plans_dir = f"{service_path}/.agentbus-plans"
+           
+           # List all plan directories (format: XXX-name)
+           if os.path.exists(plans_dir):
+               for entry in os.listdir(plans_dir):
+                   if os.path.isdir(f"{plans_dir}/{entry}"):
+                       # Extract number from start of name
+                       match = re.match(r'^(\d+)-', entry)
+                       if match:
+                           num = int(match.group(1))
+                           max_number = max(max_number, num)
+                           all_plans.append({
+                               'service': service,
+                               'plan': entry,
+                               'number': num
+                           })
+       
+       next_number = max_number + 1
+       return f"{next_number:03d}"
+   ```
+
+**6. Validate numbering consistency:**
+   - Check that there are no gaps in numbering (001, 002, 004 ← gap at 003)
+   - If gaps found: **warn user** but allow to continue
+   - If duplicate numbers found: **error** — require manual fix
+
+**7. Generate plan ID:**
+   - Use next sequential number: `004-feature-slug`
+   - **Confirm with user** before proceeding
+   
+   Example interaction:
+   ```
+   Plan ID propuesto: 004-modify-credits-endpoint
+   
+   Planes existentes encontrados:
+   - tools-service: 001-init, 002-auth-refactor, 003-api-changes
+   - bot-service: 001-init, 002-webhook-update
+   
+   ¿Confirmas crear el plan 004? (yes/no): _
+   ```
+
+### Phase 3: Initialize Plan Workspace
+
+8. **Create orchestrator workspace**:
    ```
    agentbus-orchestrator/001-feature-slug/
    ├── status.json
@@ -270,12 +327,12 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
    └── service-outputs/
    ```
 
-5. **Write SEED-PLAN.md** with:
+9. **Write SEED-PLAN.md** with:
    - Feature description
    - One section per service with initial understanding
    - Cross-service interactions (guessed)
 
-6. **Initialize status.json**:
+10. **Initialize status.json**:
    ```json
    {
      "plan_id": "001-remove-field",
@@ -293,13 +350,13 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
    }
    ```
 
-7. **Report to user**: "Wave 1 ready. Run orchestrator again to start mapping."
+11. **Report to user**: "Wave 1 ready. Run orchestrator again to start mapping."
 
-### Phase 3: Wave 1 — Service Mapping
+### Phase 4: Wave 1 — Service Mapping
 
-8. **Check status.json**: Verify wave 1 is "ready"
+12. **Check status.json**: Verify wave 1 is "ready"
 
-9. **Launch parallel subagents**:
+13. **Launch parallel subagents**:
    ```python
    for service in services:
        Task(
@@ -318,22 +375,22 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
        )
    ```
 
-10. **Wait** for all subagents to complete
+14. **Wait** for all subagents to complete
 
-11. **Read** summary JSON files from `service-outputs/`
+15. **Read** summary JSON files from `service-outputs/`
 
-12. **Update status.json**:
+16. **Update status.json**:
     - Mark wave 1 as "completed"
     - Record artifact paths
     - Mark wave 2 as "ready"
 
-13. **Report**: Summary of AGENTS.md created/updated
+17. **Report**: Summary of AGENTS.md created/updated
 
-### Phase 4: Wave 2 — Plan Refinement
+### Phase 5: Wave 2 — Plan Refinement
 
-14. **Check status.json**: Verify wave 1 is "completed"
+18. **Check status.json**: Verify wave 1 is "completed"
 
-15. **Launch parallel subagents**:
+19. **Launch parallel subagents**:
     ```python
     Task(
         subagent_name="agentbus/service-agent",
@@ -347,7 +404,7 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
                 "seed_plan": f"/workspace/agentbus-orchestrator/{plan_id}/SEED-PLAN.md"
             },
             "outputs": {
-                "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}.md",
+                "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
         }),
@@ -378,11 +435,11 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
             "service_name": service,
             "service_path": f"/workspace/{service}",
             "inputs": {
-                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}.md",
+                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
                 "agents_md": f"/workspace/{service}/AGENTS.md"
             },
             "outputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
         }),
@@ -408,11 +465,11 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
             "service_name": service,
             "service_path": f"/workspace/{service}",
             "inputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
                 "other_services": [s for s in services if s != service]
             },
             "outputs": {
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}-TEST-RESULTS.md",
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
         }),
@@ -452,11 +509,11 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
             "service_name": service,
             "service_path": f"/workspace/{service}",
             "inputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}-TEST-RESULTS.md"
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
             },
             "outputs": {
-                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
+                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/COMMITS.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
         }),

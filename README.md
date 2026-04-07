@@ -69,10 +69,11 @@ workspace/
 ├── payments-service/             # Service repo
 │   ├── AGENTS.md                 # Written by Wave 1
 │   └── .agentbus-plans/
-│       ├── 001-feature-slug.md         # Written by Wave 2
-│       ├── 001-feature-slug-CHANGES.md # Written by Wave 3
-│       ├── 001-feature-slug-TEST-RESULTS.md  # Written by Wave 4
-│       └── 001-feature-slug-COMMITS.md # Written by Wave 5 (optional)
+│       └── 001-feature-slug/     # Plan folder
+│           ├── PLAN.md           # Written by Wave 2
+│           ├── CHANGES.md        # Written by Wave 3
+│           ├── TEST-RESULTS.md   # Written by Wave 4
+│           └── COMMITS.md        # Written by Wave 5 (optional)
 │
 └── notifications-service/
     └── ... (same structure)
@@ -118,9 +119,10 @@ Create seed plan with natural language (services detected automatically):
 The orchestrator:
 1. Detects services mentioned in your prompt ("tools" → exitus-agent-tools, "bot" → exitus-bot-wa)
 2. Asks for confirmation of detected services
-3. Creates:
-   - `agentbus-orchestrator/001-remove-field/status.json`
-   - `agentbus-orchestrator/001-remove-field/SEED-PLAN.md`
+3. Validates plan numbering (scans `.agentbus-plans/` in each service, finds next sequential number)
+4. Creates:
+   - `agentbus-orchestrator/004-remove-field/status.json`
+   - `agentbus-orchestrator/004-remove-field/SEED-PLAN.md`
 
 **Fuzzy matching examples**:
 - "bot de WA" → exitus-bot-wa

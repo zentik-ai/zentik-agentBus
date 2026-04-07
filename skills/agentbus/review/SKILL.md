@@ -47,7 +47,7 @@ Or for specific services:
 
 Read from orchestrator workspace:
 - `agentbus-orchestrator/{feature-slug}/status.json` — to find which services participate
-- `{service}/.agentbus-plans/{feature-slug}-REPORT.md` — implementation reports
+- `{service}/.agentbus-plans/{feature-slug}/REPORT.md` — implementation reports
 
 ### 2. Read All Reports
 

@@ -130,10 +130,11 @@ workspace/                          # Parent folder of all repos
 ├── payments-service/               # Service repo
 │   ├── AGENTS.md                   # ← Wave 1: service documentation
 │   └── .agentbus-plans/
-│       ├── 001-feature.md          # ← Wave 2: refined plan
-│       ├── 001-feature-CHANGES.md  # ← Wave 3: implementation log
-│       ├── 001-feature-TEST-RESULTS.md  # ← Wave 4: test results
-│       └── 001-feature-COMMITS.md  # ← Wave 5: commit log (optional)
+│       └── 001-feature/            # ← Wave 2-5: plan folder
+│           ├── PLAN.md             # ← Wave 2: refined plan
+│           ├── CHANGES.md          # ← Wave 3: implementation log
+│           ├── TEST-RESULTS.md     # ← Wave 4: test results
+│           └── COMMITS.md          # ← Wave 5: commit log (optional)
 │
 └── notifications-service/
     └── ... (same structure)
