@@ -43,10 +43,12 @@ agentbus-skills/
 
 | Skill | Role | Invocation |
 |-------|------|------------|
-| `agentbus` | Entry point / router | `/agentbus-orchestrator ...` |
-| `agentbus/orchestrator` | Wave coordinator | Via `agentbus` |
-| `agentbus/service-agent` | Service specialist | Via Task tool |
-| `agentbus/review` | Consistency checker | `/agentbus-review ...` |
+| `agentbus` | Entry point / docs | `/agentbus` (information only) |
+| `agentbus-orchestrator` | Wave coordinator | `/agentbus-orchestrator ...` |
+| `agentbus-service-agent` | Service specialist | Via Task tool (internal) |
+| `agentbus-review` | Consistency checker | `/agentbus-review ...` |
+
+**Note**: Skill names use hyphens (not slashes) for compatibility with Cursor's skill system.
 
 ## Workspace Layout
 
@@ -107,15 +109,23 @@ Ask questions without writing files:
 
 ### Phase 2: Initialize Plan
 
-Create seed plan for confirmed services:
+Create seed plan with natural language (services detected automatically):
 
 ```bash
-/agentbus-orchestrator "remove deprecated field from Tool model" tools-service bot-service
+/agentbus-orchestrator "remove deprecated field from Tool model in tools and bot"
 ```
 
-This creates:
-- `agentbus-orchestrator/001-remove-field/status.json`
-- `agentbus-orchestrator/001-remove-field/SEED-PLAN.md`
+The orchestrator:
+1. Detects services mentioned in your prompt ("tools" → exitus-agent-tools, "bot" → exitus-bot-wa)
+2. Asks for confirmation of detected services
+3. Creates:
+   - `agentbus-orchestrator/001-remove-field/status.json`
+   - `agentbus-orchestrator/001-remove-field/SEED-PLAN.md`
+
+**Fuzzy matching examples**:
+- "bot de WA" → exitus-bot-wa
+- "tools" → exitus-agent-tools  
+- "api gateway" → exitus-api-gateway
 
 ### Phase 3: Wave 1 — Service Mapping
 
@@ -141,7 +151,9 @@ Each subagent:
 - Reads `SEED-PLAN.md`
 - Writes refined `PLAN.md` to service repo
 
-### Phase 5: Wave 3 — Verification
+### Phase 5: Wave 3 — Implementation
+
+⚠️ **Destructive** — Modifies source code (but doesn't commit yet)
 
 ```bash
 /agentbus-orchestrator --continue 001-remove-field
@@ -149,17 +161,30 @@ Each subagent:
 
 Each subagent:
 - Reads `PLAN.md` from its service
-- Reads `PLAN.md` from dependent services
-- Writes `REPORT.md` with verification status
+- Implements changes to source code
+- Writes `CHANGES.md` with modified files
 
-### Phase 6: Review
+The orchestrator will ask for confirmation before proceeding.
+
+### Phase 6: Wave 4 — Verification
+
+```bash
+/agentbus-orchestrator --continue 001-remove-field
+```
+
+Each subagent:
+- Reads `CHANGES.md` from its service
+- Runs tests
+- Writes `TEST-RESULTS.md` with results
+
+### Phase 7: Review
 
 ```bash
 /agentbus-review --feature-slug "001-remove-field"
 ```
 
-Reads all `REPORT.md` files and checks:
-- All services report "ready" status
+Reads all `TEST-RESULTS.md` files and checks:
+- All services pass tests
 - Dependencies are mirrored
 - API contracts are consistent
 - Deploy order is coherent
