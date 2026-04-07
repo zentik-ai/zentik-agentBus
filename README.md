@@ -73,12 +73,9 @@ Global registry file: `~/.agentbus/services.json`
 }
 ```
 
-Register services:
+**To register a service**: Read `~/.agentbus/services.json`, add entry, write back.
 
-```bash
-# Using the old script (optional, for discovery only)
-uv run scripts/register_service.py payments-service /path/to/payments-service
-```
+**To list services**: Read `~/.agentbus/services.json` and parse.
 
 ## Typical Flow
 
