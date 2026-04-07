@@ -13,6 +13,14 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 **Skill Padre**: `agentbus` — Este es un subskill especializado invocado para coordinar waves.
 
+## Skill Base vs Orchestrator
+
+| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (este archivo) |
+|---|---|---|
+| **Propósito** | Router/documentador. Decide si tu caso aplica para AgentBus. | Protocolo completo de ejecución. |
+| **Contenido** | Qué es, cuándo usar, comandos clave. | Waves, spawn de subagentes, manejo de errores. |
+| **Cuándo leer** | Primera vez usando AgentBus. | Cuando necesites detalles de implementación. |
+
 ## Core Principle: Evidence Over Communication
 
 **Files are the source of truth.** You don't accumulate state—you read artifacts when you need to know the status.
