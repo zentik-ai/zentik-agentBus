@@ -18,13 +18,12 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 **Files are the source of truth.** You don't accumulate state—you read artifacts when you need to know the status.
 
 ```
-Wave 1: Subagents write AGENTS.md       ← Mapping (understand service)
-Wave 2: Subagents write PLAN.md         ← Refinement (plan the change)
-Wave 3: Subagents modify code + commits ← Implementation (execute plan) ⚠️ DESTRUCTIVE
-Wave 4: Subagents run tests             ← Verification (verify it works)
+Wave 1: Service Mapping    →  AGENTS.md (understand service)
+Wave 2: Plan Refinement    →  PLAN.md (plan the change)
+Wave 3: Implementation     →  Code modified (no commits yet)
+Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
+Wave 5: Wrap-up (optional) →  Git commits + final deployment prep
 ```
-
-**⚠️ Wave 3 Warning**: Wave 3 modifies source code and makes git commits. Ensure services are on feature branches before running.
 
 ## When to Use
 
@@ -37,9 +36,47 @@ Or: `/agentbus-orchestrator --continue 001-feature` (resume from status.json)
 - **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus/service-agent`.
 - **No acumula estado en contexto**: Debe leer artefactos, no mantener estado en memoria.
 - **Requiere `agentbus/service-agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
-- **Wave 3 modifica código**: Asegúrate de que los servicios estén en feature branches antes de ejecutar Wave 3.
-- **Confirma Wave 3 con usuario**: Wave 3 es destructiva. Pide confirmación explícita antes de ejecutar.
+- **Wave 3 modifica código pero NO commitea**: Los commits son en Wave 5 (opcional) tras verificación exitosa.
 - **No toma decisiones de arquitectura**: Presenta opciones, el usuario decide.
+
+## Subagent Runtime (Cursor / Task Tool)
+
+**⚠️ Importante**: Para que los subagentes puedan escribir archivos, debes configurar correctamente el Task tool.
+
+### Configuración requerida
+
+```python
+Task(
+    subagent_name="agentbus/service-agent",  # o "coder" según tu entorno
+    description="Wave X: Task description",
+    prompt=json.dumps({
+        "wave": 1,
+        "service_name": "service-name",
+        "service_path": "/absolute/path/to/service",
+        "outputs": {
+            "agents_md": "/absolute/path/to/service/AGENTS.md",
+            "summary_json": "/absolute/path/to/orchestrator/service-outputs/service.json"
+        }
+    }),
+    # Flags IMPORTANTES para Cursor:
+    readonly=False,  # Permite escritura de archivos
+    # subagent_type="generalPurpose"  # Si tu entorno lo requiere
+)
+```
+
+### Fallback si subagentes no pueden escribir
+
+Si los subagentes reportan "Read-only mode":
+
+1. **Modo Manual**: Guía al usuario paso a paso:
+   ```
+   "El subagente no puede escribir en este modo. 
+    Por favor, ejecuta manualmente:
+    1. Crea archivo en {path}
+    2. Contenido: {...}"
+   ```
+
+2. **Modo Directo**: El orchestrator ejecuta las tareas directamente sin subagentes (más lento pero funciona).
 
 ## Execution Model: Sequential Waves, Parallel Services
 
@@ -48,10 +85,12 @@ Wave 1 (Mapping)
   └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
 Wave 2 (Refinement)
   └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
-Wave 3 (Implementation) ⚠️ DESTRUCTIVE
+Wave 3 (Implementation)
   └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
 Wave 4 (Verification)
   └─► Spawn N subagents in parallel ──► Wait ──► Read reports ──► Global verify
+Wave 5 (Wrap-up - optional)
+  └─► Git commits, tags, deployment prep
 ```
 
 Each wave is a separate invocation. You run Wave 1, wait for user to continue, then run Wave 2, etc.
@@ -101,8 +140,9 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
      "waves": {
        "wave_1_mapping": {"status": "ready"},
        "wave_2_refinement": {"status": "pending"},
-       "wave_3_implementation": {"status": "pending", "destructive": true},
-       "wave_4_verification": {"status": "pending"}
+       "wave_3_implementation": {"status": "pending"},
+       "wave_4_verification": {"status": "pending"},
+       "wave_5_wrapup": {"status": "pending", "optional": true}
      }
    }
    ```
@@ -113,7 +153,7 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
 
 8. **Check status.json**: Verify wave 1 is "ready"
 
-9. **Launch parallel subagents** via `Task` tool:
+9. **Launch parallel subagents**:
    ```python
    for service in services:
        Task(
@@ -127,7 +167,8 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
                    "agents_md": f"/workspace/{service}/AGENTS.md",
                    "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
                }
-           })
+           }),
+           readonly=False  # IMPORTANTE: Permitir escritura
        )
    ```
 
@@ -163,7 +204,8 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
                 "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
-        })
+        }),
+        readonly=False
     )
     ```
 
@@ -171,12 +213,12 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
 
 17. **Report**: Summary of plans refined
 
-### Phase 5: Wave 3 — Implementation ⚠️ DESTRUCTIVE
+### Phase 5: Wave 3 — Implementation
 
-18. **⚠️ CONFIRM WITH USER BEFORE PROCEEDING**:
-    - Warn: "Wave 3 will modify source code and make git commits."
-    - Verify: "Ensure all services are on feature branches, not main/master."
-    - Ask: "¿Proceder con Wave 3? (yes/no)"
+18. **Confirm with user**:
+    - "Wave 3 will modify source code files but NOT commit them."
+    - "Ensure you're on a feature branch."
+    - "¿Proceder? (yes/no)"
 
 19. **Check status.json**: Verify wave 2 is "completed"
 
@@ -194,16 +236,17 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
                 "agents_md": f"/workspace/{service}/AGENTS.md"
             },
             "outputs": {
-                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
-        })
+        }),
+        readonly=False
     )
     ```
 
 21. **Wait**, **read** summaries, **update** status.json
 
-22. **Report**: Summary of commits made per service
+22. **Report**: Summary of changes made (files modified, NO commits yet)
 
 ### Phase 6: Wave 4 — Verification
 
@@ -219,14 +262,15 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
             "service_name": service,
             "service_path": f"/workspace/{service}",
             "inputs": {
-                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
                 "other_services": [s for s in services if s != service]
             },
             "outputs": {
                 "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}-TEST-RESULTS.md",
                 "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
             }
-        })
+        }),
+        readonly=False
     )
     ```
 
@@ -239,14 +283,51 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
     - Cross-service dependencies work
     - API contracts are respected
 
-28. **Write Final Artifacts**:
+28. **Update status.json**: Mark wave 4 as "completed"
+
+29. **Report**: Test results summary, readiness status
+
+### Phase 7: Wave 5 — Wrap-up (Optional)
+
+**Only run after user confirmation that everything looks good.**
+
+30. **Confirm with user**:
+    - "Wave 5 will create git commits for all changes."
+    - "This is the point of no return."
+    - "¿Proceder con commits? (yes/no)"
+
+31. **Launch parallel subagents**:
+    ```python
+    Task(
+        subagent_name="agentbus/service-agent",
+        description=f"Wave 5: Create commits for {service}",
+        prompt=json.dumps({
+            "wave": 5,
+            "service_name": service,
+            "service_path": f"/workspace/{service}",
+            "inputs": {
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-CHANGES.md",
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}-TEST-RESULTS.md"
+            },
+            "outputs": {
+                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}-COMMITS.md",
+                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+            }
+        }),
+        readonly=False
+    )
+    ```
+
+32. **Wait**, **read** summaries
+
+33. **Write Final Artifacts**:
     - `DEPLOY-ORDER.md` — Rollout sequence with verified commits
 
-29. **Update status.json**: Mark as "completed"
+34. **Update status.json**: Mark as "completed"
 
-30. **Final Report**:
+35. **Final Report**:
     - Implementation status per service
-    - Test results summary
+    - Commit hashes
     - Deploy readiness
     - Recommended next step: deploy to staging/production
 
@@ -269,6 +350,24 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
    ```
 3. Report failure to user
 4. On retry: Re-run orchestrator for same wave (subagent will overwrite artifacts)
+
+### If subagent reports "Read-only mode"
+
+1. **Intentar modo fallback**:
+   ```python
+   # Reintentar con configuración diferente
+   Task(
+       subagent_name="coder",  # Probar con otro tipo
+       description=f"Wave X: {service} (fallback mode)",
+       prompt=...,
+       readonly=False  # Asegurar que está en False
+   )
+   ```
+
+2. **Si sigue fallando, modo manual**:
+   - Reporta al usuario: "Los subagentes no pueden escribir en este modo."
+   - Proporciona instrucciones manuales paso a paso.
+   - O ejecuta las tareas directamente tú (orchestrator).
 
 ### If user wants to add service mid-flight
 
@@ -307,49 +406,29 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
       "status": "in_progress",
       "artifacts": {}
     },
-    "wave_3_verification": {
+    "wave_3_implementation": {
       "status": "pending"
+    },
+    "wave_4_verification": {
+      "status": "pending"
+    },
+    "wave_5_wrapup": {
+      "status": "pending",
+      "optional": true
     }
   }
 }
 ```
 
-## Discovery: Code-Signals
-
-When AGENTS.md doesn't exist, detect service impact by searching:
-
-1. **Endpoint patterns**: Look for route definitions
-   ```bash
-   grep -r "app\.(get|post|put|delete)" --include="*.ts" --include="*.js"
-   ```
-
-2. **Event/topic names**: Look for message queue usage
-   ```bash
-   grep -r "kafka\|rabbitmq\|event\|emit" --include="*.ts" --include="*.py"
-   ```
-
-3. **Inter-service imports**: Look for client libraries
-   ```bash
-   grep -r "from.*payments\|import.*notifications" --include="*.ts"
-   ```
-
-4. **API clients**: Look for HTTP client usage
-   ```bash
-   grep -r "axios\|fetch\|requests" --include="*.ts" --include="*.py"
-   ```
-
-Document findings in proposed services list.
-
 ## Global Verification Checklist
 
-After Wave 3, read all REPORT.md and verify:
+After Wave 4, read all TEST-RESULTS.md and verify:
 
-- [ ] All services have REPORT.md with status "ready"
-- [ ] Dependencies: If Service A lists dependency on B, Service B mentions A
+- [ ] All services pass their tests
+- [ ] Dependencies: If Service A lists dependency on B, Service B acknowledges
 - [ ] API contracts: Breaking changes documented by producer AND consumer
 - [ ] Deploy order: No circular dependencies
 - [ ] Open questions: All have owners assigned
-- [ ] Rollback plans: Present for risky changes
 
 If any check fails, report which services need re-processing.
 
@@ -358,9 +437,7 @@ If any check fails, report which services need re-processing.
 You produce:
 1. **status.json** — Tracking for resume/retry
 2. **SEED-PLAN.md** — Initial vision
-3. **PLAN.md** — Consolidated view (synthesis of service plans)
-4. **TEST-PLAN.md** — Cross-service test strategy
-5. **DEPLOY-ORDER.md** — Rollout sequence
+3. **DEPLOY-ORDER.md** — Rollout sequence (final)
 
 ## Anti-Patterns
 
@@ -368,6 +445,8 @@ You produce:
 ❌ **Don't**: Ask subagents to return data in response text
 ❌ **Don't**: Write implementation details in status.json
 ❌ **Don't**: Assume services without AGENTS.md are unimportant
+❌ **Don't**: Spawn subagents without `readonly=False` if they need to write
 ✅ **Do**: Read artifacts when you need to know something
 ✅ **Do**: Write clear, actionable final reports
 ✅ **Do**: Let subagents own service-level details
+✅ **Do**: Confirm with user before destructive operations (Wave 3, Wave 5)

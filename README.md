@@ -11,8 +11,9 @@ Instead of accumulating state in memory, AgentBus writes artifacts at each stage
 ```
 Wave 1: Service Mapping    →  AGENTS.md (understand service)
 Wave 2: Plan Refinement    →  PLAN.md (plan the change)
-Wave 3: Implementation     →  Code + COMMITS.md ⚠️ DESTRUCTIVE
+Wave 3: Implementation     →  Code modified (no commits yet)
 Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
+Wave 5: Wrap-up (optional) →  Git commits + deployment prep
 ```
 
 Benefits:
@@ -67,8 +68,9 @@ workspace/
 │   ├── AGENTS.md                 # Written by Wave 1
 │   └── .agentbus-plans/
 │       ├── 001-feature-slug.md         # Written by Wave 2
-│       ├── 001-feature-slug-COMMITS.md # Written by Wave 3
-│       └── 001-feature-slug-TEST-RESULTS.md  # Written by Wave 4
+│       ├── 001-feature-slug-CHANGES.md # Written by Wave 3
+│       ├── 001-feature-slug-TEST-RESULTS.md  # Written by Wave 4
+│       └── 001-feature-slug-COMMITS.md # Written by Wave 5 (optional)
 │
 └── notifications-service/
     └── ... (same structure)

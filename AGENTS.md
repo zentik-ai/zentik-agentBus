@@ -17,15 +17,18 @@ Cross-service planning system for LLM coding agents. Eliminates the "developer a
 
 ## Architecture
 
-### Four-Wave Execution Model
+### Five-Wave Execution Model
 
 ```
 Wave 1: Service Mapping    →  AGENTS.md per service
 Wave 2: Plan Refinement    →  PLAN.md per service
-Wave 3: Implementation     →  Code modified + COMMITS.md ⚠️ DESTRUCTIVE
+Wave 3: Implementation     →  Code modified + CHANGES.md (no commits)
 Wave 4: Verification       →  TEST-RESULTS.md per service
+Wave 5: Wrap-up (optional) →  COMMITS.md per service
 Final:  Global synthesis   →  Deploy order
 ```
+
+**Note**: Commits only happen in Wave 5, after successful verification and user confirmation.
 
 ### Components
 
@@ -81,7 +84,9 @@ workspace/
 │   ├── AGENTS.md               # Written by Wave 1
 │   └── .agentbus-plans/
 │       ├── 001-feature.md      # Written by Wave 2
-│       └── 001-feature-REPORT.md # Written by Wave 3
+│       ├── 001-feature-CHANGES.md # Written by Wave 3
+│       ├── 001-feature-TEST-RESULTS.md # Written by Wave 4
+│       └── 001-feature-COMMITS.md # Written by Wave 5 (optional)
 │
 └── service-b/
     └── ... (same structure)
@@ -91,7 +96,9 @@ workspace/
 
 1. **AGENTS.md** — Service documentation (stack, arch, APIs, conventions)
 2. **PLAN.md** — Refined implementation plan per feature
-3. **REPORT.md** — Verification report with readiness status
+3. **CHANGES.md** — List of files modified in Wave 3 (ready for commit)
+4. **TEST-RESULTS.md** — Verification report with test results
+5. **COMMITS.md** — Git commit log (created in Wave 5, optional)
 
 ### Status Tracking
 
