@@ -217,6 +217,124 @@ Generated: YYYY-MM-DD
 
 ---
 
+### Wave 2: Context Queries (Optional)
+
+**Purpose**: Request information from other services to complete your plan
+
+**When to use**: During Wave 2, if you discover you need to know:
+- API response shapes from services you call
+- Database schemas you depend on
+- Event contracts from other services
+
+**How it works**:
+1. During Wave 2 planning, identify external dependencies you need info about
+2. Instead of guessing, write summary with `status: "needs_context"`
+3. The orchestrator will spawn query-only agents and re-run you with answers
+
+**Example Scenario**:
+```
+You're planning changes in cronjob-api that call users-api.
+You need to know: "What fields does /users/{id} return?"
+
+Instead of guessing:
+- Write provisional PLAN.md with gaps
+- Write summary requesting context query
+- Orchestrator fetches info and re-runs you
+- You complete PLAN.md with accurate info
+```
+
+**Summary JSON for Context Request**:
+```json
+{
+  "wave": 2,
+  "status": "needs_context",
+  "artifacts_written": ["/workspace/cronjob-api/.agentbus-plans/001-feature/PLAN.md"],
+  "context_queries": [
+    {
+      "target_service": "users-api",
+      "question": "What is the exact shape of GET /users/{id} response?",
+      "files_of_interest": ["src/routes/users.py", "src/models/user.py"],
+      "blocking": true,
+      "rationale": "Need to know if branch_name is in org.branch_name or direct"
+    }
+  ],
+  "provisional_plan_summary": "Adding owner_user_id validation, but need to confirm users-api response shape",
+  "unresolved_questions": [
+    "Is the users list in 'results' or 'data'?",
+    "Where does branch_name live in the response?"
+  ]
+}
+```
+
+**Context Query Response** (you'll receive this in re-run):
+```json
+{
+  "context_from_queries": {
+    "users-api": {
+      "GET /users/{id}": {
+        "response_shape": {"results": {"id": "uuid", "org": {"branch_name": "string"}}},
+        "source_file": "src/routes/users.py:45"
+      }
+    }
+  }
+}
+```
+
+---
+
+### Mode: Context Query Only (Query-Only Subagent)
+
+**Purpose**: Answer a specific question about this service (read-only)
+
+**Input Context**:
+```json
+{
+  "mode": "context_query",
+  "target_service": "users-api",
+  "service_path": "/workspace/users-api",
+  "question": "What fields does GET /users/{id} return?",
+  "files_of_interest": ["src/routes/users.py", "src/models/user.py"],
+  "inputs": {
+    "agents_md": "/workspace/users-api/AGENTS.md"
+  }
+}
+```
+
+**Your Tasks**:
+1. Read AGENTS.md to understand the service
+2. Read the specific files mentioned
+3. Answer the question precisely
+4. **Do NOT write any files** (this is read-only)
+5. Return answer in summary JSON
+
+**Summary JSON for Query Response**:
+```json
+{
+  "mode": "context_query",
+  "target_service": "users-api",
+  "question": "What fields does GET /users/{id} return?",
+  "answer": {
+    "response_shape": {
+      "results": {
+        "id": "uuid",
+        "email": "string",
+        "name": "string",
+        "org": {
+          "id": "uuid",
+          "branch_name": "string",
+          "branch_code": "string"
+        }
+      }
+    },
+    "source": "src/routes/users.py:45-60",
+    "notes": "branch_name is nested in org object"
+  },
+  "confidence": "high"
+}
+```
+
+---
+
 ### Wave 3: Implementation (NO Commits)
 
 **Purpose**: Execute the plan—modify code, run tests, but do NOT commit

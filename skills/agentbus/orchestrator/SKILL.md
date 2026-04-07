@@ -412,20 +412,135 @@ Before creating the plan, validate numbering consistency across all services.
     )
     ```
 
-16. **Wait**, **read** summaries, **update** status.json
+20. **Wait**, **read** summaries
 
-17. **Report**: Summary of plans refined
+21. **Detect Context Queries Needed**:
+    ```python
+    # Check each summary for status: "needs_context"
+    pending_queries = []
+    for service in services:
+        summary = read_json(f"service-outputs/{service}.json")
+        if summary.get("status") == "needs_context":
+            pending_queries.append({
+                "requesting_service": service,
+                "queries": summary.get("context_queries", [])
+            })
+    ```
 
-### Phase 5: Wave 3 — Implementation
+22. **If Context Queries Pending**:
+    
+    **Report to user**:
+    ```
+    Wave 2 PARCIALMENTE completada.
+    
+    Servicios con planes listos:
+    ✓ sales-crm-ui — PLAN.md completo
+    
+    Servicios que necesitan contexto externo:
+    ⚠ exitus-crm-cronjob-api
+      
+      Queries pendientes:
+      • users-api — "What is the exact shape of GET /users/{id} response?"
+        Justificación: "Need to know if branch_name is in org.branch_name or direct"
+    
+    ¿Ejecutar context queries para obtener información adicional? (yes/skip): _
+    ```
+    
+    **If user says "yes"**:
+    
+    23. **Execute Context Queries**:
+        ```python
+        # Collect all unique target services
+        target_services = set()
+        for item in pending_queries:
+            for query in item["queries"]:
+                target_services.add(query["target_service"])
+        
+        # Spawn query-only agents for each target service
+        for target_service in target_services:
+            Task(
+                subagent_name="agentbus/service-agent",
+                description=f"Context Query: {target_service}",
+                prompt=json.dumps({
+                    "mode": "context_query",
+                    "target_service": target_service,
+                    "service_path": f"/workspace/{target_service}",
+                    "questions": [q for q in all_queries if q.target == target_service],
+                    "inputs": {
+                        "agents_md": f"/workspace/{target_service}/AGENTS.md"
+                    }
+                }),
+                readonly=True  # Query-only, no writes
+            )
+        ```
+    
+    24. **Collect Query Results**:
+        ```python
+        context_results = {}
+        for target_service in target_services:
+            result = read_json(f"service-outputs/{target_service}-query.json")
+            context_results[target_service] = result
+        ```
+    
+    25. **Re-run Wave 2 with Context**:
+        ```python
+        # Re-run only services that needed context
+        for service_info in pending_queries:
+            service = service_info["requesting_service"]
+            
+            # Get relevant context for this service
+            service_context = {}
+            for query in service_info["queries"]:
+                target = query["target_service"]
+                if target in context_results:
+                    service_context[target] = context_results[target]
+            
+            Task(
+                subagent_name="agentbus/service-agent",
+                description=f"Wave 2 (with context): Refine plan for {service}",
+                prompt=json.dumps({
+                    "wave": 2,
+                    "mode": "plan_refinement_with_context",
+                    "service_name": service,
+                    "service_path": f"/workspace/{service}",
+                    "inputs": {
+                        "agents_md": f"/workspace/{service}/AGENTS.md",
+                        "seed_plan": f"/workspace/agentbus-orchestrator/{plan_id}/SEED-PLAN.md",
+                        "previous_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+                        "context_from_queries": service_context
+                    },
+                    "outputs": {
+                        "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+                        "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+                    }
+                }),
+                readonly=False
+            )
+        ```
+    
+    26. **Wait for completion** and update status
 
-18. **Confirm with user**:
+    **If user says "skip"**:
+    - Mark Wave 2 as "completed_with_warnings"
+    - Note in status.json that context was skipped
+    - Proceed with provisional plans
+
+27. **Update status.json**: Mark wave 2 as "completed"
+
+28. **Final Report**: Summary of all plans (with or without context)
+
+---
+
+### Phase 6: Wave 3 — Implementation
+
+29. **Confirm with user**:
     - "Wave 3 will modify source code files but NOT commit them."
     - "Ensure you're on a feature branch."
     - "¿Proceder? (yes/no)"
 
-19. **Check status.json**: Verify wave 2 is "completed"
+30. **Check status.json**: Verify wave 2 is "completed"
 
-20. **Launch parallel subagents**:
+31. **Launch parallel subagents**:
     ```python
     Task(
         subagent_name="agentbus/service-agent",
@@ -447,15 +562,15 @@ Before creating the plan, validate numbering consistency across all services.
     )
     ```
 
-21. **Wait**, **read** summaries, **update** status.json
+32. **Wait**, **read** summaries, **update** status.json
 
-22. **Report**: Summary of changes made (files modified, NO commits yet)
+33. **Report**: Summary of changes made (files modified, NO commits yet)
 
-### Phase 6: Wave 4 — Verification
+### Phase 7: Wave 4 — Verification
 
-23. **Check status.json**: Verify wave 3 is "completed"
+34. **Check status.json**: Verify wave 3 is "completed"
 
-24. **Launch parallel subagents**:
+35. **Launch parallel subagents**:
     ```python
     Task(
         subagent_name="agentbus/service-agent",
@@ -477,29 +592,29 @@ Before creating the plan, validate numbering consistency across all services.
     )
     ```
 
-25. **Wait**, **read** summaries
+36. **Wait**, **read** summaries
 
-26. **Read** all TEST-RESULTS.md files for global verification
+37. **Read** all TEST-RESULTS.md files for global verification
 
-27. **Run Global Verification**:
+38. **Run Global Verification**:
     - All services pass tests
     - Cross-service dependencies work
     - API contracts are respected
 
-28. **Update status.json**: Mark wave 4 as "completed"
+39. **Update status.json**: Mark wave 4 as "completed"
 
-29. **Report**: Test results summary, readiness status
+40. **Report**: Test results summary, readiness status
 
-### Phase 7: Wave 5 — Wrap-up (Optional)
+### Phase 8: Wave 5 — Wrap-up (Optional)
 
 **Only run after user confirmation that everything looks good.**
 
-30. **Confirm with user**:
+41. **Confirm with user**:
     - "Wave 5 will create git commits for all changes."
     - "This is the point of no return."
     - "¿Proceder con commits? (yes/no)"
 
-31. **Launch parallel subagents**:
+42. **Launch parallel subagents**:
     ```python
     Task(
         subagent_name="agentbus/service-agent",
@@ -521,14 +636,14 @@ Before creating the plan, validate numbering consistency across all services.
     )
     ```
 
-32. **Wait**, **read** summaries
+43. **Wait**, **read** summaries
 
-33. **Write Final Artifacts**:
+44. **Write Final Artifacts**:
     - `DEPLOY-ORDER.md` — Rollout sequence with verified commits
 
-34. **Update status.json**: Mark as "completed"
+45. **Update status.json**: Mark as "completed"
 
-35. **Final Report**:
+46. **Final Report**:
     - Implementation status per service
     - Commit hashes
     - Deploy readiness

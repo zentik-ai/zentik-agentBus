@@ -76,17 +76,31 @@ Ejecuta la siguiente wave basada en `status.json`.
 
 ---
 
-## Modelo de 5 Waves
+## Modelo de 5 Waves (+ Context Queries)
 
 | Wave | Nombre | Output | Descripción |
 |------|--------|--------|-------------|
 | 1 | Service Mapping | `AGENTS.md` | Entiende cada servicio |
-| 2 | Plan Refinement | `PLAN.md` | Plan detallado por servicio |
+| 2a | Plan Refinement | `PLAN.md` | Plan detallado por servicio |
+| 2b | Context Queries | Respuestas | Consulta servicios adyacentes |
 | 3 | Implementation | Código + `CHANGES.md` | Modifica código (no commits) |
 | 4 | Verification | `TEST-RESULTS.md` | Corre tests |
 | 5 | Wrap-up (opt) | `COMMITS.md` | Commits post-verificación |
 
 **Importante:** Corre **una wave a la vez**. Revisa resultados antes de continuar.
+
+### Context Queries (Wave 2b)
+
+Durante el planning, si un service-agent necesita información de otros servicios (ej: "¿qué devuelve el endpoint de users-api?"), puede solicitar **context queries**.
+
+**Flujo**:
+1. Service-agent detecta necesidad → Escribe PLAN provisional
+2. Reporta `status: "needs_context"` con queries pendientes
+3. Orchestrator spawnea **query-only agents** en servicios adyacentes
+4. Re-ejecuta service-agent con el contexto obtenido
+5. Completa PLAN.md final
+
+**Ventaja**: No mapeas servicios que no modificas, pero obtienes contexto preciso cuando lo necesitas.
 
 ---
 
