@@ -1,14 +1,17 @@
 ---
-name: agentbus-orchestrator
+name: agentbus/orchestrator
 description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow.
 version: 1.0.0
 triggers: [agentbus plan, cross-service feature, multi-service orchestration]
 tools: [Read, Write, Bash, Glob, Grep, Task]
+tags: [agentbus, orchestrator, wave-based, coordination, microservices]
 ---
 
 # AgentBus Orchestrator
 
 Coordinates cross-service planning across microservices. Lives at the workspace level (parent folder of service repos), not inside any service.
+
+**Skill Padre**: `agentbus` — Este es un subskill especializado invocado para coordinar waves.
 
 ## Core Principle: Evidence Over Communication
 
@@ -20,35 +23,19 @@ Wave 2: Subagents write PLAN.md ← You read summaries
 Wave 3: Subagents write REPORT.md ← You read reports for global verification
 ```
 
-## Workspace Structure
-
-```
-workspace/
-├── agentbus-orchestrator/          # Your workspace (NOT a git repo)
-│   └── XXX-feature-slug/
-│       ├── status.json              # Your tracking file
-│       ├── SEED-PLAN.md             # Your vision
-│       ├── PLAN.md                  # Your synthesis
-│       ├── TEST-PLAN.md             # Cross-service tests
-│       ├── DEPLOY-ORDER.md          # Rollout sequence
-│       └── service-outputs/         # Subagent summaries
-│           └── {service}.json
-│
-├── payments-service/               # Service repo
-│   ├── AGENTS.md                   # Written by Wave 1 subagent
-│   └── .agentbus-plans/
-│       ├── XXX-feature-slug.md              # Written by Wave 2
-│       └── XXX-feature-slug-REPORT.md       # Written by Wave 3
-│
-└── notifications-service/
-    └── ... (same structure)
-```
-
 ## When to Use
 
 User invokes: `/agentbus-orchestrator "feature description" service1 service2 ...`
 
 Or: `/agentbus-orchestrator --continue 001-feature` (resume from status.json)
+
+## Limitaciones
+
+- **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus/service-agent`.
+- **No acumula estado en contexto**: Debe leer artefactos, no mantener estado en memoria.
+- **Requiere `agentbus/service-agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
+- **No modifica código de servicios**: Solo lee y escribe archivos de planificación.
+- **No toma decisiones de arquitectura**: Presenta opciones, el usuario decide.
 
 ## Execution Model: Sequential Waves, Parallel Services
 
@@ -123,7 +110,7 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
    ```python
    for service in services:
        Task(
-           subagent_name="agentbus-service-agent",
+           subagent_name="agentbus/service-agent",
            description=f"Wave 1: Map {service}",
            prompt=json.dumps({
                "wave": 1,
@@ -155,7 +142,7 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
 15. **Launch parallel subagents**:
     ```python
     Task(
-        subagent_name="agentbus-service-agent",
+        subagent_name="agentbus/service-agent",
         description=f"Wave 2: Refine plan for {service}",
         prompt=json.dumps({
             "wave": 2,
@@ -187,7 +174,7 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
     other_plans = {s: f"/workspace/{s}/.agentbus-plans/{plan_id}.md" for s in services if s != current}
     
     Task(
-        subagent_name="agentbus-service-agent",
+        subagent_name="agentbus/service-agent",
         description=f"Wave 3: Verify {service}",
         prompt=json.dumps({
             "wave": 3,

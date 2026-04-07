@@ -26,11 +26,26 @@ Benefits:
 ```text
 agentbus-skills/
 ├── skills/
-│   ├── agentbus-orchestrator/    # Cross-service coordinator
-│   ├── agentbus-service-agent/   # Per-service specialist (replaces agentbus-expert)
-│   ├── agentbus-review/          # Consistency checker
+│   ├── agentbus/                 # Skill family
+│   │   ├── SKILL.md              # Entry point / base skill
+│   │   ├── orchestrator/         # Cross-service coordinator
+│   │   │   └── SKILL.md
+│   │   ├── service-agent/        # Per-service specialist
+│   │   │   └── SKILL.md
+│   │   └── review/               # Consistency checker
+│   │       └── SKILL.md
 │   └── map-codebase/             # Codebase exploration
+│       └── SKILL.md
 ```
+
+### Skill Hierarchy
+
+| Skill | Role | Invocation |
+|-------|------|------------|
+| `agentbus` | Entry point / router | `/agentbus-orchestrator ...` |
+| `agentbus/orchestrator` | Wave coordinator | Via `agentbus` |
+| `agentbus/service-agent` | Service specialist | Via Task tool |
+| `agentbus/review` | Consistency checker | `/agentbus-review ...` |
 
 ## Workspace Layout
 

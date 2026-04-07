@@ -1,9 +1,10 @@
 ---
 name: agentbus
-description: Cross-service planning system for LLM coding agents. Orchestrates multi-wave planning across microservices with evidence-based workflow.
+description: Cross-service planning system for LLM coding agents. Entry point skill that orchestrates multi-wave planning across microservices.
 version: 1.0.0
 triggers: [cross-service feature, multi-service planning, service architecture]
 tools: [Read, Write, Bash, Task]
+tags: [agentbus, orchestration, microservices, cross-service, planning, wave-based]
 ---
 
 # AgentBus Skills
@@ -35,6 +36,43 @@ Final:   Orchestrator reads REPORTs → Global synthesis
 - **Auditability**: Complete history in version-controlled files
 - **Resumability**: Failed waves can be retried independently
 - **Reusability**: AGENTS.md serves as living service documentation
+
+## Jerarquía de Skills
+
+Este es el **skill base** (entry point). Delega a subskills especializados:
+
+| Subskill | Propósito | Invocación |
+|----------|-----------|------------|
+| `agentbus/orchestrator` | Coordina waves cross-service | `/agentbus-orchestrator ...` |
+| `agentbus/service-agent` | Especialista por servicio | Via Task tool (interno) |
+| `agentbus/review` | Verifica consistencia | `/agentbus-review ...` |
+
+## Delegación
+
+### Para planificar un feature completo:
+
+1. **Skill base** (tú): Detecta feature y servicios afectados
+2. **Invoca** `agentbus/orchestrator` para inicializar y ejecutar cada wave
+3. **Orchestrator** invoca `agentbus/service-agent` vía Task tool para cada servicio
+4. **Finalmente** invoca `agentbus/review` para verificar consistencia
+
+### Ejemplo de flujo:
+
+```
+Usuario: "Planifica feature X en servicios A, B, C"
+
+Tú (skill base):
+  → Detectas servicios
+  → /agentbus-orchestrator "feature X" A B C
+
+Orchestrator (por wave):
+  → Spawns agentbus/service-agent vía Task tool
+  → Lee artefactos
+  → Reporta progreso
+
+Final:
+  → /agentbus/review --feature-slug "xxx"
+```
 
 ## Quick Start Commands
 
@@ -83,7 +121,7 @@ Verify cross-service consistency:
 **Purpose**: Create/update AGENTS.md in each service
 
 What happens:
-- Orchestrator spawns parallel subagents (one per service)
+- Orchestrator spawns parallel `agentbus/service-agent` subagents (one per service)
 - Each subagent maps codebase: stack, architecture, APIs, DB, testing
 - Writes AGENTS.md to service repo
 - Writes summary JSON to orchestrator workspace
@@ -121,14 +159,13 @@ Orchestrator reads all REPORT.md and generates:
 - `TEST-PLAN.md` — cross-service test strategy
 - `DEPLOY-ORDER.md` — rollout sequence
 
-## Available Skills
+## Limitaciones
 
-| Skill | Purpose | Invocation |
-|-------|---------|------------|
-| **agentbus-orchestrator** | Coordinates waves, spawns subagents | `/agentbus-orchestrator "feature" svc1 svc2` |
-| **agentbus-service-agent** | Per-service specialist (spawned by orchestrator) | Via Task tool only |
-| **agentbus-review** | Verifies cross-service consistency | `/agentbus-review --feature-slug "xxx"` |
-| **map-codebase** | Creates AGENTS.md for undocumented services | `/map-codebase` (auto-invoked) |
+- **No ejecutar todas las waves en una sola sesión**: El contexto se agota. Ejecuta una wave, revisa, continúa.
+- **No modificar AGENTS.md manualmente durante planning**: Deja que el subagente de Wave 1 lo actualice.
+- **No ignorar Wave 3 (verificación)**: Siempre verifica antes de implementar.
+- **No agregar >5 servicios sin confirmación**: Propón lista, deja que el usuario confirme/ajuste.
+- **No asumir disponibilidad de subskills**: El orchestrator requiere que `agentbus/service-agent` esté disponible para el Task tool.
 
 ## Workspace Structure
 
@@ -334,9 +371,9 @@ Tracking file that enables resume/retry. Contains:
 
 ## Getting Help
 
-- **Orchestrator protocol**: `@skills/agentbus-orchestrator/SKILL.md`
-- **Service agent protocol**: `@skills/agentbus-service-agent/SKILL.md`
-- **Review protocol**: `@skills/agentbus-review/SKILL.md`
+- **Orchestrator protocol**: `@skills/agentbus/orchestrator/SKILL.md`
+- **Service agent protocol**: `@skills/agentbus/service-agent/SKILL.md`
+- **Review protocol**: `@skills/agentbus/review/SKILL.md`
 - **Full spec**: `agentBus_PRD`
 
 ## Version

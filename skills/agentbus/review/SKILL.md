@@ -1,14 +1,17 @@
 ---
-name: agentbus-review
+name: agentbus/review
 description: Review cross-service plans for consistency. Reads IMPLEMENTATION-REPORT.md files directly and detects missing plans, inconsistent decisions, and conflicting open questions.
 version: 2.0.0
 triggers: [agentbus review, plan verification, cross-service consistency check]
 tools: [Read, Write, Glob]
+tags: [agentbus, review, consistency, verification, cross-service]
 ---
 
 # AgentBus Review
 
 Markdown-first review protocol for cross-service plans. Reads IMPLEMENTATION-REPORT.md files directly—no scripts required.
+
+**Skill Padre**: `agentbus` — Este es un subskill especializado para verificación post-planificación.
 
 ## When to Use
 
@@ -17,6 +20,14 @@ Use this skill:
 - Before implementation starts
 - When adding a new service mid-flight
 - To verify consistency after plan updates
+
+## Limitaciones
+
+- **Solo lectura de artefactos**: No modifiques los REPORT.md o PLAN.md. Solo lee y reporta inconsistencias.
+- **No corrección automática**: Identifica problemas pero no los corrige. Recomienda re-ejecutar waves.
+- **Dependencia de Wave 3**: Requiere que los REPORT.md existan. Si no existen, pide re-ejecutar Wave 3.
+- **Sin ejecución de código**: No ejecutes tests o verificaciones automáticas. La revisión es basada en documentación.
+- **No contexto de implementación**: Solo verifica consistencia de planes, no la calidad de la implementación propuesta.
 
 ## Invocation
 
@@ -184,6 +195,7 @@ You:
 ❌ **Don't**: Use Python scripts to parse markdown
 ❌ **Don't**: Assume all services have REPORTs
 ❌ **Don't**: Report "ok" if any service is blocked
+❌ **Don't**: Modify the plans you're reviewing
 ✅ **Do**: Read markdown files directly
 ✅ **Do**: Check cross-references between services
 ✅ **Do**: Write findings to REVIEW.md for audit trail

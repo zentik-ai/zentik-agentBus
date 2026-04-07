@@ -30,9 +30,11 @@ Final:  Global synthesis    →  Consolidated views
 
 | Component | Purpose | Location |
 |-----------|---------|----------|
-| Orchestrator | Coordinates waves, reads artifacts | `skills/agentbus-orchestrator/` |
-| Service Agent | Maps, refines, verifies per service | `skills/agentbus-service-agent/` |
-| Review | Checks cross-service consistency | `skills/agentbus-review/` |
+| agentbus (base) | Entry point / router | `skills/agentbus/SKILL.md` |
+| agentbus/orchestrator | Wave coordinator | `skills/agentbus/orchestrator/` |
+| agentbus/service-agent | Maps/refines/verifies per service | `skills/agentbus/service-agent/` |
+| agentbus/review | Consistency checker | `skills/agentbus/review/` |
+| map-codebase | Codebase explorer | `skills/map-codebase/` |
 
 ### File Structure
 
@@ -44,10 +46,21 @@ agentbus-skills/
 ├── agentBus_details.md          # Implementation details (Spanish)
 ├── refactor_agentbus.md         # Refactor plan
 └── skills/
-    ├── agentbus-orchestrator/   # Global coordinator
-    ├── agentbus-service-agent/  # Per-service specialist
-    ├── agentbus-review/         # Consistency checker
-    └── map-codebase/            # Codebase exploration
+    ├── agentbus/                # Skill family
+    │   ├── SKILL.md             # Entry point (base skill)
+    │   ├── orchestrator/        # Subskill
+    │   ├── service-agent/       # Subskill
+    │   └── review/              # Subskill
+    └── map-codebase/            # Independent skill
+```
+
+### Skill Hierarchy
+
+```
+agentbus (base/router)
+├── agentbus/orchestrator (spawned by base)
+│   └── spawns agentbus/service-agent via Task tool
+└── agentbus/review (called by user)
 ```
 
 ## Key Conventions
