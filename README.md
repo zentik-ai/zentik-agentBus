@@ -2,108 +2,192 @@
 
 Cross-service planning skills for LLM coding agents.
 
-This project removes the "developer as messenger" problem when understanding
-and planning features that touch multiple repos. The orchestrator can answer
-cross-service questions from docs first, then write a draft plan into each
-service repo when you are ready.
+This project removes the "developer as messenger" problem when understanding and planning features that touch multiple repos. Uses an **evidence-based workflow**: files are the source of truth.
 
-## Current design decisions
+## Core Principle: Evidence Over Communication
 
-- State is file-based (`.agentbus-plans/` in each service repo)
-- No MCP server, no Redis, no background bus
-- Python scripts run with `uv`
-- Canonical service names are repo names (for example `payments-service`)
-- Simplified aliases are accepted (`payments`) and normalized to canonical names
+Instead of accumulating state in memory, AgentBus writes artifacts at each stage:
 
-## Repository layout
+```
+Wave 1: Service Mapping    →  AGENTS.md in each service
+Wave 2: Plan Refinement    →  PLAN.md in each service  
+Wave 3: Verification       →  REPORT.md in each service
+Final:   Orchestrator reads REPORTs → Global view
+```
+
+Benefits:
+- **Context efficiency**: Orchestrator reads only what it needs
+- **Auditability**: Complete history in version-controlled files
+- **Resumability**: Failed waves can be retried independently
+- **Reusability**: AGENTS.md serves as ongoing service documentation
+
+## Repository Layout
 
 ```text
 agentbus-skills/
-├── scripts/
-│   ├── register_service.py
-│   ├── list_services.py
-│   ├── next_plan_number.py
-│   ├── write_plan.py
-│   ├── read_plan.py
-│   └── review_plans.py
-└── skills/
-    ├── agentbus-orchestrator/
-    ├── agentbus-expert/
-    ├── agentbus-review/
-    └── map-codebase/
+├── skills/
+│   ├── agentbus-orchestrator/    # Cross-service coordinator
+│   ├── agentbus-service-agent/   # Per-service specialist (replaces agentbus-expert)
+│   ├── agentbus-review/          # Consistency checker
+│   └── map-codebase/             # Codebase exploration
+```
+
+## Workspace Layout
+
+Your workspace (parent of all service repos):
+
+```
+workspace/
+├── agentbus-orchestrator/        # Orchestrator workspace (not a git repo)
+│   └── 001-feature-slug/
+│       ├── status.json           # Wave tracking
+│       ├── SEED-PLAN.md          # Initial vision
+│       ├── PLAN.md               # Consolidated view
+│       ├── TEST-PLAN.md          # Cross-service tests
+│       ├── DEPLOY-ORDER.md       # Rollout sequence
+│       └── service-outputs/      # Subagent summaries
+│           └── {service}.json
+│
+├── payments-service/             # Service repo
+│   ├── AGENTS.md                 # Written by Wave 1
+│   └── .agentbus-plans/
+│       ├── 001-feature-slug.md         # Written by Wave 2
+│       └── 001-feature-slug-REPORT.md  # Written by Wave 3
+│
+└── notifications-service/
+    └── ... (same structure)
 ```
 
 ## Prerequisites
 
-- `uv`
+None for core orchestration. Skills use `Task` tool for subagent spawning.
 
-Install:
+## Service Registry
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-## Service registry
-
-Global registry file:
-
-`~/.agentbus/services.json`
-
-Example:
+Global registry file: `~/.agentbus/services.json`
 
 ```json
 {
   "payments-service": "/home/jero/repos/payments-service",
-  "notifications-service": "/home/jero/repos/notifications-service",
-  "crm-service": "/home/jero/repos/crm-service"
+  "notifications-service": "/home/jero/repos/notifications-service"
 }
 ```
 
 Register services:
 
 ```bash
+# Using the old script (optional, for discovery only)
 uv run scripts/register_service.py payments-service /path/to/payments-service
-uv run scripts/register_service.py notifications-service /path/to/notifications-service
-uv run scripts/register_service.py crm-service /path/to/crm-service
 ```
 
-## Typical flow
+## Typical Flow
 
-1. Discover first (optional, no file writes):
+### Phase 1: Discovery (Optional)
+
+Ask questions without writing files:
 
 ```bash
-/agentbus-orchestrator --ask "how does onboarding move across services today?" payments notifications crm
+/agentbus-orchestrator --ask "how does onboarding work across services?" payments notifications
 ```
 
-2. Run orchestrator in plan mode (can use aliases in invocation):
+### Phase 2: Initialize Plan
+
+Create seed plan for confirmed services:
 
 ```bash
-/agentbus-orchestrator "migrate sync calls to Kafka events" payments notifications crm
+/agentbus-orchestrator "remove deprecated field from Tool model" tools-service bot-service
 ```
 
-3. Open each service repo and run:
+This creates:
+- `agentbus-orchestrator/001-remove-field/status.json`
+- `agentbus-orchestrator/001-remove-field/SEED-PLAN.md`
+
+### Phase 3: Wave 1 — Service Mapping
+
+Run orchestrator again to start mapping:
 
 ```bash
-/agentbus-expert
+# Reads status.json, launches parallel subagents
+/agentbus-orchestrator --continue 001-remove-field
 ```
 
-4. Plans are stored in each repo under:
+Each subagent writes:
+- `{service}/AGENTS.md` (creates or updates)
+- Summary JSON to orchestrator workspace
 
-`<service-repo>/.agentbus-plans/<NNN>-<feature-slug>.md`
-
-5. Run review gate before implementation:
+### Phase 4: Wave 2 — Plan Refinement
 
 ```bash
-/agentbus-review --feature-slug "kafka-migration"
+/agentbus-orchestrator --continue 001-remove-field
 ```
 
-Or for selected services:
+Each subagent:
+- Reads `AGENTS.md` from its service
+- Reads `SEED-PLAN.md`
+- Writes refined `PLAN.md` to service repo
+
+### Phase 5: Wave 3 — Verification
 
 ```bash
-/agentbus-review --feature-slug "kafka-migration" --services payments notifications
+/agentbus-orchestrator --continue 001-remove-field
 ```
+
+Each subagent:
+- Reads `PLAN.md` from its service
+- Reads `PLAN.md` from dependent services
+- Writes `REPORT.md` with verification status
+
+### Phase 6: Review
+
+```bash
+/agentbus-review --feature-slug "001-remove-field"
+```
+
+Reads all `REPORT.md` files and checks:
+- All services report "ready" status
+- Dependencies are mirrored
+- API contracts are consistent
+- Deploy order is coherent
+
+## How Verification Works
+
+### Service-Level Verification (Wave 3 Subagent)
+
+Each service subagent writes `REPORT.md` with:
+- Verification status: ready / needs_work / blocked
+- Implementation checklist
+- Files to modify
+- Local risks with mitigations
+- Cross-service dependencies
+- Open questions with owners
+
+### Global Verification (Orchestrator + Review)
+
+Orchestrator reads all `REPORT.md` and verifies:
+- Plan completeness
+- Dependency mirroring (A depends on B → B acknowledges A)
+- Contract consistency
+- Sequencing coherence
+- Question ownership
+
+## Adding Services Mid-Flight
+
+1. Update `status.json` to add service
+2. Re-run orchestrator for current wave
+3. Only new service gets processed
+
+## Retry Strategy
+
+If a subagent fails:
+1. Check `status.json` for error details
+2. Fix underlying issue
+3. Re-run orchestrator for that wave
+4. Subagent overwrites its artifacts
 
 ## Notes
 
-- Current version favors simplicity over strong concurrency controls.
-- Plans are kept in repo for visibility/auditability (not gitignored by default).
+- **No helper scripts required** for core orchestration logic
+- Skills use `Task` tool to spawn parallel subagents
+- AGENTS.md persists as living service documentation
+- Plans are kept in repos for visibility/auditability
+- Current version favors simplicity over strong concurrency controls
