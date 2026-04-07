@@ -35,9 +35,139 @@ Wave 5: Wrap-up (optional) →  Git commits + final deployment prep
 
 ## When to Use
 
-User invokes: `/agentbus-orchestrator "feature description" service1 service2 ...`
+User invokes with descripción natural:
 
-Or: `/agentbus-orchestrator --continue 001-feature` (resume from status.json)
+```
+/agentbus-orchestrator "necesito modificar el endpoint de credits en el bot de WA y tools"
+```
+
+El orchestrator detecta automáticamente los servicios mencionados (ver "Service Detection" abajo).
+
+O para continuar:
+
+```
+/agentbus-orchestrator --continue 001-feature
+```
+
+## Service Detection & Fuzzy Matching
+
+### Algoritmo de Detección
+
+1. **Extrae candidatos** del prompt del usuario:
+   - Busca nombres de servicios, variaciones, o abreviaturas
+   - Ejemplos: "bot de WA" → "exitus-bot-wa", "tools" → "exitus-agent-tools"
+
+2. **Lee registry**: `~/.agentbus/services.json`
+
+3. **Fuzzy matching**:
+   - Match exacto: "exitus-bot-wa" → exitus-bot-wa
+   - Match parcial: "bot" → exitus-bot-wa (si es único)
+   - Match semántico: "bot de WA" → exitus-bot-wa
+   - Abreviaturas: "tools" → exitus-agent-tools
+
+4. **Resolución de conflictos**:
+   - Si hay múltiples matches, muestra opciones numeradas
+   - Si no hay matches claros, muestra todos los servicios disponibles
+
+### Interacción con Usuario
+
+**Caso A: Matches claros encontrados**
+
+```
+Usuario: /agentbus-orchestrator "modificar endpoint en bot de WA y tools"
+
+Orchestrator: Detecté posibles servicios:
+• "bot de WA" → exitus-bot-wa ✓
+• "tools" → exitus-agent-tools ✓
+
+¿Confirmas estos servicios? (yes/no/edit): _
+```
+
+**Caso B: Matches ambiguos**
+
+```
+Usuario: /agentbus-orchestrator "cambiar el api"
+
+Orchestrator: "api" podría ser:
+1. exitus-api-gateway
+2. exitus-agent-tools (tiene APIs)
+
+¿Cuál servicio(s)? (número(s) o nombre(s)): _
+```
+
+**Caso C: Sin matches**
+
+```
+Usuario: /agentbus-orchestrator "hacer algo"
+
+Orchestrator: No detecté servicios en tu mensaje.
+
+Servicios disponibles en registry:
+1. exitus-agent-tools  (/workspace/exitus-agent-tools)
+2. exitus-bot-wa       (/workspace/exitus-bot-wa)
+3. exitus-api-gateway  (/workspace/exitus-api-gateway)
+
+¿Cuáles usar? (números o nombres, separados por comas o espacios): _
+```
+
+### Implementación del Matching
+
+```python
+def detect_services(user_prompt, registry_services):
+    """
+    registry_services: dict from ~/.agentbus/services.json
+    Returns: list of matched service names
+    """
+    candidates = []
+    
+    # 1. Extraer tokens potenciales del prompt
+    #    (nombres propios, términos técnicos, etc.)
+    
+    # 2. Para cada servicio en registry, calcular score de match
+    for service_name in registry_services:
+        score = calculate_match_score(user_prompt, service_name)
+        if score > THRESHOLD:
+            candidates.append((service_name, score))
+    
+    # 3. Ordenar por score y retornar
+    return sorted(candidates, key=lambda x: x[1], reverse=True)
+
+def calculate_match_score(prompt, service_name):
+    """
+    Estrategias de matching:
+    - Exact match: 100 puntos
+    - Contiene substring: 80 puntos
+    - Palabra similar (Levenshtein): 60 puntos
+    - Abreviatura match: 70 puntos
+    """
+    prompt_lower = prompt.lower()
+    service_lower = service_name.lower()
+    
+    # Exact match
+    if service_name in prompt or service_lower in prompt_lower:
+        return 100
+    
+    # Substring match (ej: "bot" en "exitus-bot-wa")
+    parts = service_name.replace('-', ' ').replace('_', ' ').split()
+    for part in parts:
+        if part in prompt_lower and len(part) > 2:
+            return 80
+    
+    # Abreviaturas comunes
+    abbreviations = {
+        'tools': ['exitus-agent-tools', 'agent-tools'],
+        'bot': ['exitus-bot-wa', 'exitus-bot'],
+        'wa': ['exitus-bot-wa'],
+        'api': ['exitus-api-gateway'],
+        'gateway': ['exitus-api-gateway'],
+    }
+    
+    for abbr, services in abbreviations.items():
+        if abbr in prompt_lower and service_name in services:
+            return 70
+    
+    return 0
+```
 
 ## Limitaciones
 
@@ -108,16 +238,24 @@ Each wave is a separate invocation. You run Wave 1, wait for user to continue, t
 ### Phase 1: Intake & Discovery
 
 1. **Parse request**
-   - Feature description (what to build)
-   - Candidate services (from user or registry)
+   - Feature description completa del prompt del usuario
+   - Extrae candidatos de servicios usando "Service Detection & Fuzzy Matching" (ver sección arriba)
+   - Si no hay matches claros, muestra lista de servicios disponibles
+   - **NO asumas servicios** sin confirmación del usuario
 
-2. **Detect service impact** (docs-first)
-   - Read existing AGENTS.md from candidate services (if exists)
+2. **Confirmar servicios con usuario**
+   - Muestra matches propuestos con explicación (ej: "bot de WA" → exitus-bot-wa)
+   - Espera confirmación: yes / no / edit
+   - Si editar: pide lista de servicios correctos
+   - Si no hay registry: guía al usuario a crear `~/.agentbus/services.json` primero
+
+3. **Detect service impact** (docs-first, post-confirmación)
+   - Read existing AGENTS.md from confirmed services (if exists)
    - Read README.md, API.md, CLAUDE.md
    - Search for code-signals: endpoints, event names, imports between services
    - Propose list of affected services
 
-3. **User confirmation**
+4. **User confirmation final**
    - Write proposed services to temp file: `/tmp/agentbus-XXX-proposed-services.txt`
    - Ask user to confirm/adjust
    - Finalize service list
