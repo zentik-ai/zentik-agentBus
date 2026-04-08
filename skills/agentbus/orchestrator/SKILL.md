@@ -605,7 +605,168 @@ Before creating the plan, validate numbering consistency across all services.
 
 40. **Report**: Test results summary, readiness status
 
-### Phase 8: Wave 5 — Wrap-up (Optional)
+### Phase 8: Wave 4b — Adjustments & Clarifications (Optional)
+
+**Purpose**: Minor tweaks, fixes, and clarifications after verification—no full replanning needed
+
+**When to use**:
+- Some tests failed with minor issues (typos, wrong mocks, small logic errors)
+- You want to understand what changed and how it works now
+- Quick questions about the implementation
+- Small adjustments that don't require a new PLAN.md
+
+**Not for**:
+- Major architectural changes (that would be a new plan)
+- Adding significant new features
+- Breaking API changes
+
+**Interaction Example**:
+
+```
+Wave 4 completada — Test Results:
+✓ sales-crm-ui: 12/12 pass
+⚠ exitus-crm-cronjob-api: 10/12 pass
+  - test_validation_email: FAILED
+  - test_branch_lookup: FAILED
+
+¿Ajustes o preguntas? (yes/no): yes
+
+[Opciones disponibles]
+1. Explicar fallo — "¿Por qué falla test_validation_email?"
+2. Ajuste rápido — "Arregla la validación de email"
+3. Re-correr tests — "Re-run tests en cronjob-api"
+4. Listo — Continuar a Wave 5
+
+Tu elección: 1
+
+[Service-agent investiga y explica]
+"El test falla porque el mock no incluye el campo 'branch_name' 
+ que ahora espera la validación."
+
+¿Solicitar ajuste? (yes/no): yes
+→ Spawnea adjustment agent
+→ Modifica mock en test
+→ Re-run test_validation_email
+→ ✅ PASS
+
+¿Más ajustes? (yes/no): no
+→ Listo para Wave 5
+```
+
+**41. Detect if Adjustments Needed**:
+    ```python
+    # Read all TEST-RESULTS.md
+    for service in services:
+        results = read_test_results(service)
+        if results["failed_tests"] > 0:
+            suggest_adjustment_phase = True
+    ```
+
+**42. Offer Adjustment Phase**:
+    ```
+    Wave 4b: Adjustments & Clarifications
+    
+    Servicios con tests fallidos:
+    • cronjob-api — 2 tests fallando
+    
+    Servicios que pasaron todos:
+    • sales-crm-ui — ✅ 12/12 pass
+    
+    Opciones:
+    [a] Ajustes — Revisar y arreglar fallos menores
+    [p] Preguntas — Entender qué cambió y cómo funciona
+    [s] Skip — Continuar a Wave 5 (commits) con fallos conocidos
+    
+    Tu elección: _
+    ```
+
+**43. If Adjustments Selected**:
+
+    **Modo "Explain"** (preguntas al usuario):
+    ```python
+    Task(
+        subagent_name="agentbus/service-agent",
+        description=f"Wave 4b Explain: Clarify {service}",
+        prompt=json.dumps({
+            "mode": "explain",
+            "wave": "4b",
+            "service_name": service,
+            "service_path": f"/workspace/{service}",
+            "inputs": {
+                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
+            },
+            "question": "[User's question, e.g., 'Why does test X fail?']"
+        }),
+        readonly=True
+    )
+    ```
+    
+    Agent returns explanation, no file changes.
+
+**44. If Quick Fix Selected**:
+
+    ```python
+    Task(
+        subagent_name="agentbus/service-agent",
+        description=f"Wave 4b Fix: Quick adjustment for {service}",
+        prompt=json.dumps({
+            "mode": "quick_fix",
+            "wave": "4b",
+            "service_name": service,
+            "service_path": f"/workspace/{service}",
+            "inputs": {
+                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
+            },
+            "fix_request": "[User's fix request, e.g., 'Fix mock in test X']",
+            "outputs": {
+                "changes_log_append": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}-4b.json"
+            }
+        }),
+        readonly=False
+    )
+    ```
+    
+    Agent makes small code changes, appends to CHANGES.md.
+
+**45. Re-run Tests After Fix** (optional):
+
+    ```python
+    # Only for services that were adjusted
+    Task(
+        subagent_name="agentbus/service-agent",
+        description=f"Wave 4b Re-test: {service}",
+        prompt=json.dumps({
+            "wave": 4,
+            "service_name": service,
+            "service_path": f"/workspace/{service}",
+            "inputs": {
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md"
+            },
+            "outputs": {
+                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
+                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+            }
+        }),
+        readonly=False
+    )
+    ```
+
+**46. Update CHANGES.md**:
+    - Append adjustments to existing CHANGES.md
+    - Mark as "Adjustment from Wave 4b"
+
+**47. Loop Until User Satisfied**:
+    - Ask: "¿Más ajustes o pasar a Wave 5?"
+    - Continue until user says "done"
+
+**48. Update status.json**: Mark wave 4b as "completed" or "skipped"
+
+### Phase 9: Wave 5 — Wrap-up (Optional)
 
 **Only run after user confirmation that everything looks good.**
 

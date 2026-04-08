@@ -525,6 +525,142 @@ git checkout -- src/api/tools.ts src/db/migration.sql
 
 ---
 
+### Wave 4b: Adjustments & Clarifications (Optional)
+
+**Purpose**: Minor fixes and explanations after Wave 4—no full replanning
+
+**⚠️ IMPORTANTE**: Esto es para ajustes pequeños, no cambios arquitectónicos grandes.
+
+#### Modo A: Explain (Clarifications)
+
+**Input Context**:
+```json
+{
+  "mode": "explain",
+  "wave": "4b",
+  "service_name": "cronjob-api",
+  "service_path": "/workspace/cronjob-api",
+  "inputs": {
+    "plan": "/workspace/cronjob-api/.agentbus-plans/001-feature/PLAN.md",
+    "changes_log": "/workspace/cronjob-api/.agentbus-plans/001-feature/CHANGES.md",
+    "test_results": "/workspace/cronjob-api/.agentbus-plans/001-feature/TEST-RESULTS.md"
+  },
+  "question": "Why does test_validation_email fail?"
+}
+```
+
+**Your Tasks**:
+1. Read PLAN.md, CHANGES.md, and TEST-RESULTS.md
+2. Investigate the specific question
+3. Explain clearly what happened and why
+4. **Do NOT write any files** (this is read-only)
+5. Return explanation in summary
+
+**Example Interaction**:
+```
+User: "Why does test_validation_email fail?"
+
+You investigate and respond:
+"El test falla porque el mock de users-api no incluye el campo 
+'branch_name' que ahora espera la validación. El mock actual retorna:
+  { id: 1, email: 'test@test.com' }
+Pero la validación ahora espera:
+  { id: 1, email: 'test@test.com', org: { branch_name: 'Norte' } }
+
+Para arreglarlo, necesitas actualizar el mock en el test."
+```
+
+**Summary JSON for Explain**:
+```json
+{
+  "mode": "explain",
+  "wave": "4b",
+  "question": "Why does test_validation_email fail?",
+  "explanation": "El mock no incluye branch_name que la validación ahora espera",
+  "files_involved": ["test/validation.test.ts"],
+  "suggested_fix": "Actualizar mock para incluir org.branch_name"
+}
+```
+
+---
+
+#### Modo B: Quick Fix (Minor Adjustments)
+
+**Input Context**:
+```json
+{
+  "mode": "quick_fix",
+  "wave": "4b",
+  "service_name": "cronjob-api",
+  "service_path": "/workspace/cronjob-api",
+  "inputs": {
+    "plan": "/workspace/cronjob-api/.agentbus-plans/001-feature/PLAN.md",
+    "changes_log": "/workspace/cronjob-api/.agentbus-plans/001-feature/CHANGES.md",
+    "test_results": "/workspace/cronjob-api/.agentbus-plans/001-feature/TEST-RESULTS.md"
+  },
+  "fix_request": "Fix mock in test_validation_email to include branch_name",
+  "outputs": {
+    "changes_log_append": "/workspace/cronjob-api/.agentbus-plans/001-feature/CHANGES.md",
+    "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/cronjob-api-4b.json"
+  }
+}
+```
+
+**Your Tasks**:
+1. Read existing files
+2. Make the requested small fix (ej: actualizar mock, corregir typo, ajustar validación)
+3. **Append** to CHANGES.md (don't overwrite—add as "Wave 4b Adjustment")
+4. Re-run the specific failing test
+5. Report results
+
+**What counts as "quick fix"**:
+- ✅ Actualizar mocks en tests
+- ✅ Corregir typos en mensajes de error
+- ✅ Ajustar validaciones (regex, rangos)
+- ✅ Fix imports faltantes
+- ✅ Cambiar valores hardcodeados a constantes
+
+**What is NOT a quick fix** (would need new plan):
+- ❌ Cambiar arquitectura de la solución
+- ❌ Agregar nuevos endpoints
+- ❌ Modificar contratos de API
+- ❌ Cambiar modelo de base de datos
+
+**CHANGES.md Append Format**:
+```markdown
+## Wave 4b Adjustments
+
+### Adjustment 1: Fix mock in test_validation_email
+- **File**: `test/validation.test.ts`
+- **Change**: Updated mock to include `org.branch_name`
+- **Reason**: Test was failing due to missing field in mock
+- **Test result after fix**: ✅ PASS
+
+### Adjustment 2: [If more fixes]
+...
+```
+
+**Summary JSON for Quick Fix**:
+```json
+{
+  "mode": "quick_fix",
+  "wave": "4b",
+  "fixes_applied": [
+    {
+      "file": "test/validation.test.ts",
+      "description": "Updated mock to include branch_name",
+      "test_result": "pass"
+    }
+  ],
+  "tests_re_run": ["test_validation_email"],
+  "tests_passing_now": 12,
+  "tests_failing_still": 0,
+  "status": "ready_for_wave_5"
+}
+```
+
+---
+
 ### Wave 5: Wrap-up / Commits
 
 **Purpose**: Create git commits for all verified changes

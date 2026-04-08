@@ -76,7 +76,7 @@ Ejecuta la siguiente wave basada en `status.json`.
 
 ---
 
-## Modelo de 5 Waves (+ Context Queries)
+## Modelo de Waves (+ Context Queries & Adjustments)
 
 | Wave | Nombre | Output | Descripción |
 |------|--------|--------|-------------|
@@ -85,6 +85,7 @@ Ejecuta la siguiente wave basada en `status.json`.
 | 2b | Context Queries | Respuestas | Consulta servicios adyacentes |
 | 3 | Implementation | Código + `CHANGES.md` | Modifica código (no commits) |
 | 4 | Verification | `TEST-RESULTS.md` | Corre tests |
+| 4b | Adjustments (opt) | Ajustes | Fixes menores y aclaraciones |
 | 5 | Wrap-up (opt) | `COMMITS.md` | Commits post-verificación |
 
 **Importante:** Corre **una wave a la vez**. Revisa resultados antes de continuar.
@@ -101,6 +102,32 @@ Durante el planning, si un service-agent necesita información de otros servicio
 5. Completa PLAN.md final
 
 **Ventaja**: No mapeas servicios que no modificas, pero obtienes contexto preciso cuando lo necesitas.
+
+### Adjustments (Wave 4b)
+
+Después de Wave 4 (tests), si hay fallos menores o necesitas aclaraciones:
+
+**Modo Explain**:
+- Pregunta: "¿Por qué falla este test?"
+- Service-agent investiga y explica (read-only)
+
+**Modo Quick Fix**:
+- Ajuste menor: "Arregla el mock en el test"
+- Fix de typo, validación, import faltante
+- **No** cambios arquitectónicos grandes
+- Se apenda a CHANGES.md
+- Re-corre tests afectados
+
+**Cuándo usar**:
+- ✅ Tests fallan por mocks desactualizados
+- ✅ Typos en mensajes de error
+- ✅ Validaciones que necesitan tweak
+- ✅ Preguntas sobre qué cambió
+
+**Cuándo NO usar** (necesita nuevo plan):
+- ❌ Cambiar arquitectura
+- ❌ Agregar endpoints nuevos
+- ❌ Modificar contratos de API
 
 ---
 
