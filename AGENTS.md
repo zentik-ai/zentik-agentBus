@@ -11,11 +11,13 @@ AgentBus Skills is a **cross-service planning system for LLM coding agents**. It
 The system uses an **evidence-based workflow** where artifacts are written at each stage instead of accumulating state in memory:
 
 ```
-Wave 1: Service Mapping    →  AGENTS.md per service
-Wave 2: Plan Refinement    →  PLAN.md per service  
-Wave 3: Implementation     →  Code modified (no commits yet)
-Wave 4: Verification       →  TEST-RESULTS.md per service
-Wave 5: Wrap-up (optional) →  Git commits + deployment prep
+Wave 1:  Service Mapping      →  AGENTS.md per service
+Wave 2a: Plan Refinement      →  PLAN.md per service
+Wave 2b: Context Queries      →  Answers from adjacent services
+Wave 3:  Implementation       →  Modified code + CHANGES.md
+Wave 4:  Verification         →  TEST-RESULTS.md per service
+Wave 4b: Adjustments (opt)   →  Minor fixes + clarifications
+Wave 5:  Wrap-up (opt)       →  Git commits + deployment prep
 ```
 
 **Benefits**:
@@ -40,17 +42,23 @@ Wave 5: Wrap-up (optional) →  Git commits + deployment prep
 
 ## Architecture
 
-### Five-Wave Execution Model
+### Seven-Wave Execution Model
 
 | Wave | Name | Input | Output | Purpose |
 |------|------|-------|--------|---------|
 | 1 | Service Mapping | Service codebase | AGENTS.md | Understand the service |
-| 2 | Plan Refinement | AGENTS.md + requirement | PLAN.md | Plan the change |
-| 3 | Implementation | PLAN.md | Modified code + CHANGES.md | Execute the plan (no commits) |
+| 2a | Plan Refinement | AGENTS.md + requirement | PLAN.md | Plan the change |
+| 2b | Context Queries | PLAN provisional | Answers from other services | Get info without mapping |
+| 3 | Implementation | PLAN.md | Modified code + CHANGES.md | Execute (no commits) |
 | 4 | Verification | Modified code + tests | TEST-RESULTS.md | Verify it works |
-| 5 | Wrap-up | TEST-RESULTS.md | COMMITS.md | Create git commits (optional) |
+| 4b | Adjustments (opt) | TEST-RESULTS.md | Minor fixes | Quick fixes, no replan |
+| 5 | Wrap-up (opt) | Verified changes | COMMITS.md | Create commits |
 
 **Important**: Commits only happen in Wave 5, after successful verification and user confirmation.
+
+**Key Features**:
+- **Context Queries (2b)**: Query adjacent services without adding them to the plan
+- **Adjustments (4b)**: Minor fixes after tests without full replanning
 
 ### Skill Hierarchy
 
@@ -64,9 +72,9 @@ agentbus (base skill - entry point/router)
 | Skill | Purpose | Location | Invocation |
 |-------|---------|----------|------------|
 | **agentbus** | Entry point / router | `skills/agentbus/SKILL.md` | Implicit via subskill |
-| **agentbus/orchestrator** | Coordinates waves, spawns subagents | `skills/agentbus/orchestrator/SKILL.md` | `/agentbus-orchestrator ...` |
-| **agentbus/service-agent** | Per-service specialist | `skills/agentbus/service-agent/SKILL.md` | Via Task tool only |
-| **agentbus/review** | Verifies cross-service consistency | `skills/agentbus/review/SKILL.md` | `/agentbus-review ...` |
+| **agentbus-orchestrator** | Coordinates waves, spawns subagents | `skills/agentbus/orchestrator/SKILL.md` | `/agentbus-orchestrator ...` |
+| **agentbus-service-agent** | Per-service specialist | `skills/agentbus/service-agent/SKILL.md` | Via Task tool only |
+| **agentbus-review** | Verifies cross-service consistency | `skills/agentbus/review/SKILL.md` | `/agentbus-review ...` |
 | **map-codebase** | Codebase explorer | `skills/map-codebase/SKILL.md` | Auto-invoked |
 
 ---
@@ -77,7 +85,7 @@ agentbus (base skill - entry point/router)
 agentbus-skills/
 ├── README.md                          # Human-facing documentation
 ├── AGENTS.md                          # This file - agent guide
-├── WAVE-3-4-DESIGN.md                 # Design document for Waves 3-4 (Spanish)
+
 ├── .gitignore                         # Git ignore rules
 ├── skills/
 │   ├── SKILL.md                       # Skill registry / base skill index
@@ -201,19 +209,19 @@ Example status.json:
    ```
    /agentbus-orchestrator --continue 001-feature
    ```
-   Creates: `{service}/.agentbus-plans/001-feature.md`
+   Creates: `{service}/.agentbus-plans/001-feature/PLAN.md`
 
 5. **Wave 3 - Implementation**:
    ```
    /agentbus-orchestrator --continue 001-feature
    ```
-   Modifies code, creates: `{service}/.agentbus-plans/001-feature-CHANGES.md`
+   Modifies code, creates: `{service}/.agentbus-plans/001-feature/CHANGES.md`
 
 6. **Wave 4 - Verification**:
    ```
    /agentbus-orchestrator --continue 001-feature
    ```
-   Creates: `{service}/.agentbus-plans/001-feature-TEST-RESULTS.md`
+   Creates: `{service}/.agentbus-plans/001-feature/TEST-RESULTS.md`
 
 7. **Review**:
    ```
@@ -225,7 +233,7 @@ Example status.json:
    ```
    /agentbus-orchestrator --continue 001-feature
    ```
-   Creates git commits + `{service}/.agentbus-plans/001-feature-COMMITS.md`
+   Creates git commits + `{service}/.agentbus-plans/001-feature/COMMITS.md`
 
 ---
 

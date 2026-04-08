@@ -9,11 +9,13 @@ This project removes the "developer as messenger" problem when understanding and
 Instead of accumulating state in memory, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1: Service Mapping    →  AGENTS.md (understand service)
-Wave 2: Plan Refinement    →  PLAN.md (plan the change)
-Wave 3: Implementation     →  Code modified (no commits yet)
-Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
-Wave 5: Wrap-up (optional) →  Git commits + deployment prep
+Wave 1:  Service Mapping      →  AGENTS.md (understand service)
+Wave 2a: Plan Refinement      →  PLAN.md (plan the change)
+Wave 2b: Context Queries      →  Answers from adjacent services
+Wave 3:  Implementation       →  Code modified (no commits yet)
+Wave 4:  Verification         →  TEST-RESULTS.md (verify it works)
+Wave 4b: Adjustments (opt)   →  Minor fixes + clarifications
+Wave 5:  Wrap-up (opt)       →  Git commits + deployment prep
 ```
 
 Benefits:
@@ -49,6 +51,18 @@ agentbus-skills/
 | `agentbus-review` | Consistency checker | `/agentbus-review ...` |
 
 **Note**: Skill names use hyphens (not slashes) for compatibility with Cursor's skill system.
+
+### Wave Summary
+
+| Wave | Purpose | Key Output |
+|------|---------|------------|
+| 1 | Map services | `AGENTS.md` |
+| 2a | Create plans | `PLAN.md` |
+| 2b | Query adjacent services | Context answers |
+| 3 | Implement changes | Modified code + `CHANGES.md` |
+| 4 | Verify with tests | `TEST-RESULTS.md` |
+| 4b | Adjust/fix minor issues | Updated code |
+| 5 | Create commits | Git commits + `COMMITS.md` |
 
 ## Workspace Layout
 
