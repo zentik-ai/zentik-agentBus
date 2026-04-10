@@ -44,9 +44,9 @@ Sistema de planificación cross-service para features que tocan **2+ microservic
 
 | Componente | Rol | Invocación |
 |------------|-----|------------|
-| `agentbus-orchestrator` | Coordina waves cross-service | `/agentbus-orchestrator ...` |
+| `agentbus orchestrator` | Coordina waves cross-service | `/agentbus orchestrator ...` |
 | `agentbus/service-agent` | Especialista por servicio | Spawned vía Task (interno) |
-| `agentbus-review` | Verifica consistencia cross-service | `/agentbus-review ...` |
+| `agentbus review` | Verifica consistencia cross-service | `/agentbus review ...` |
 
 ---
 
@@ -71,7 +71,7 @@ Ejecuta la siguiente wave basada en `status.json`.
 
 ### Verificar Consistencia
 ```
-/agentbus-review --feature-slug 001-feature
+/agentbus review --feature-slug 001-feature
 ```
 
 ---
@@ -166,9 +166,9 @@ Ejemplo: Si existe `003-feature`, el nuevo será `004-nuevo-feature`.
 
 ## Documentación Detallada
 
-- **Protocolo completo**: `@skills/agentbus-orchestrator/SKILL.md`
-- **Service agent**: `@skills/agentbus-service-agent/SKILL.md`
-- **Review**: `@skills/agentbus-review/SKILL.md`
+- **Protocolo completo**: `@skills/agentbus orchestrator/SKILL.md`
+- **Service agent**: `@skills/agentbus service agent/SKILL.md`
+- **Review**: `@skills/agentbus review/SKILL.md`
 
 ---
 

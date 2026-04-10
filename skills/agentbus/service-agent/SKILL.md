@@ -1,5 +1,5 @@
 ---
-name: agentbus-service-agent
+name: agentbus service agent
 description: Service-level specialist subagent for AgentBus. Maps codebase, refines plans, implements changes (no commits), and verifies results. Works on a single service only.
 version: 1.0.0
 triggers: [agentbus wave execution, service mapping, plan refinement, implementation, verification]

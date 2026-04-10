@@ -1,5 +1,5 @@
 ---
-name: agentbus-review
+name: agentbus review
 description: Review cross-service plans for consistency. Reads IMPLEMENTATION-REPORT.md files directly and detects missing plans, inconsistent decisions, and conflicting open questions.
 version: 2.0.0
 triggers: [agentbus review, plan verification, cross-service consistency check]

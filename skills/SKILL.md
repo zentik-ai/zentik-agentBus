@@ -61,7 +61,7 @@ The orchestrator:
 ### Continue Waves
 
 ```
-/agentbus-orchestrator --continue 004-feature
+/agentbus orchestrator --continue 004-feature
 ```
 
 Runs the next wave based on `status.json`.
@@ -69,7 +69,7 @@ Runs the next wave based on `status.json`.
 ### Review Cross-Service Consistency
 
 ```
-/agentbus-review --feature-slug "004-feature"
+/agentbus review --feature-slug "004-feature"
 ```
 
 ## Wave Execution Model
@@ -171,7 +171,7 @@ Runs the next wave based on `status.json`.
 | Skill | Purpose | Invocation |
 |-------|---------|------------|
 | **agentbus-orchestrator** | Coordinates waves, spawns subagents | `/agentbus-orchestrator "feature"` |
-| **agentbus-service-agent** | Per-service specialist | Via Task tool only |
+| **agentbus service agent** | Per-service specialist | Via Task tool only |
 | **agentbus-review** | Verifies cross-service consistency | `/agentbus-review --feature-slug "xxx"` |
 
 ## Workspace Structure

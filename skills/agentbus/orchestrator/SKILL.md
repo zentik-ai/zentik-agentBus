@@ -1,5 +1,5 @@
 ---
-name: agentbus-orchestrator
+name: agentbus orchestrator
 description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow.
 version: 1.0.0
 triggers: [agentbus plan, cross-service feature, multi-service orchestration]
@@ -15,7 +15,7 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 ## Skill Base vs Orchestrator
 
-| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (`agentbus-orchestrator/SKILL.md`) |
+| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (`agentbus orchestrator/SKILL.md`) |
 |---|---|---|
 | **Propósito** | Router/documentador. Decide si tu caso aplica para AgentBus. | Protocolo completo de ejecución. |
 | **Contenido** | Qué es, cuándo usar, comandos clave. | Waves, spawn de subagentes, manejo de errores. |
@@ -171,9 +171,9 @@ def calculate_match_score(prompt, service_name):
 
 ## Limitaciones
 
-- **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus/service-agent`.
+- **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus service agent`.
 - **No acumula estado en contexto**: Debe leer artefactos, no mantener estado en memoria.
-- **Requiere `agentbus/service-agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
+- **Requiere `agentbus service agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
 - **Wave 3 modifica código pero NO commitea**: Los commits son en Wave 5 (opcional) tras verificación exitosa.
 - **No toma decisiones de arquitectura**: Presenta opciones, el usuario decide.
 
@@ -185,7 +185,7 @@ def calculate_match_score(prompt, service_name):
 
 ```python
 Task(
-    subagent_name="agentbus/service-agent",  # o "coder" según tu entorno
+    subagent_name="agentbus service agent",  # o "coder" según tu entorno
     description="Wave X: Task description",
     prompt=json.dumps({
         "wave": 1,
@@ -360,7 +360,7 @@ Before creating the plan, validate numbering consistency across all services.
    ```python
    for service in services:
        Task(
-           subagent_name="agentbus/service-agent",
+           subagent_name="agentbus service agent",
            description=f"Wave 1: Map {service}",
            prompt=json.dumps({
                "wave": 1,
@@ -393,7 +393,7 @@ Before creating the plan, validate numbering consistency across all services.
 19. **Launch parallel subagents**:
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 2: Refine plan for {service}",
         prompt=json.dumps({
             "wave": 2,
@@ -459,7 +459,7 @@ Before creating the plan, validate numbering consistency across all services.
         # Spawn query-only agents for each target service
         for target_service in target_services:
             Task(
-                subagent_name="agentbus/service-agent",
+                subagent_name="agentbus service agent",
                 description=f"Context Query: {target_service}",
                 prompt=json.dumps({
                     "mode": "context_query",
@@ -496,7 +496,7 @@ Before creating the plan, validate numbering consistency across all services.
                     service_context[target] = context_results[target]
             
             Task(
-                subagent_name="agentbus/service-agent",
+                subagent_name="agentbus service agent",
                 description=f"Wave 2 (with context): Refine plan for {service}",
                 prompt=json.dumps({
                     "wave": 2,
@@ -543,7 +543,7 @@ Before creating the plan, validate numbering consistency across all services.
 31. **Launch parallel subagents**:
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 3: Implement changes for {service}",
         prompt=json.dumps({
             "wave": 3,
@@ -573,7 +573,7 @@ Before creating the plan, validate numbering consistency across all services.
 35. **Launch parallel subagents**:
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 4: Verify implementation for {service}",
         prompt=json.dumps({
             "wave": 4,
@@ -685,7 +685,7 @@ Tu elección: 1
     **Modo "Explain"** (preguntas al usuario):
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 4b Explain: Clarify {service}",
         prompt=json.dumps({
             "mode": "explain",
@@ -709,7 +709,7 @@ Tu elección: 1
 
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 4b Fix: Quick adjustment for {service}",
         prompt=json.dumps({
             "mode": "quick_fix",
@@ -738,7 +738,7 @@ Tu elección: 1
     ```python
     # Only for services that were adjusted
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 4b Re-test: {service}",
         prompt=json.dumps({
             "wave": 4,
@@ -778,7 +778,7 @@ Tu elección: 1
 42. **Launch parallel subagents**:
     ```python
     Task(
-        subagent_name="agentbus/service-agent",
+        subagent_name="agentbus service agent",
         description=f"Wave 5: Create commits for {service}",
         prompt=json.dumps({
             "wave": 5,

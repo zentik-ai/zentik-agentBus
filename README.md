@@ -46,9 +46,9 @@ agentbus-skills/
 | Skill | Role | Invocation |
 |-------|------|------------|
 | `agentbus` | Entry point / docs | `/agentbus` (information only) |
-| `agentbus-orchestrator` | Wave coordinator | `/agentbus-orchestrator ...` |
-| `agentbus-service-agent` | Service specialist | Via Task tool (internal) |
-| `agentbus-review` | Consistency checker | `/agentbus-review ...` |
+| `agentbus orchestrator` | Wave coordinator | `/agentbus orchestrator ...` |
+| `agentbus service agent` | Service specialist | Via Task tool (internal) |
+| `agentbus review` | Consistency checker | `/agentbus review ...` |
 
 **Note**: Skill names use hyphens (not slashes) for compatibility with Cursor's skill system.
 
