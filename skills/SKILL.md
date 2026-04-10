@@ -55,7 +55,15 @@ Wave 5:  Wrap-up (opt)       →  Git commits
 
 This provides context about the 7-wave model, routing, and conventions.
 
-### Step 2: Initialize a New Plan
+### Step 2: Local Service Repositories (Required)
+
+**All services to modify must be:**
+- Cloned locally in your workspace
+- Listed in `~/.agentbus/services.json`
+
+The orchestrator needs local file access — it cannot work with remote repos.
+
+### Step 3: Initialize a New Plan
 
 ```
 /agentbus orchestrator "remove deprecated field from Tool model in tools and bot"

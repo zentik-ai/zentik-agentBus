@@ -110,7 +110,24 @@ This loads the base skill which provides context about:
 
 **Without this step, the LLM won't know how to use the orchestrator properly.**
 
-### 2. Service Registry Setup
+### 2. Local Service Repositories (Required)
+
+**All services you want to modify must be:**
+- ✅ Cloned locally on your machine
+- ✅ Inside your current working directory (workspace)
+- ✅ Listed in `~/.agentbus/services.json` with correct paths
+
+**Example:**
+```
+workspace/
+├── exitus-agent-tools/     ← Local clone
+├── exitus-bot-wa/          ← Local clone
+└── agentbus-orchestrator/  ← Created by the tool
+```
+
+**The orchestrator cannot work with remote repositories** — it needs local access to read and modify files.
+
+### 3. Service Registry Setup
 
 ## Service Registry
 

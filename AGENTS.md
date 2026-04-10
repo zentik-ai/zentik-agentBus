@@ -306,7 +306,7 @@ Example status.json:
 
 ## Prerequisites
 
-### Load the AgentBus Skill First
+### 1. Load the AgentBus Skill First
 
 **Before using any AgentBus commands, initialize the skill** so the LLM understands the system:
 
@@ -320,6 +320,15 @@ This provides essential context about:
 - When to use AgentBus vs other skills
 
 **Without this step, the LLM won't know how to use the orchestrator properly.**
+
+### 2. Local Service Repositories (Required)
+
+**All services you plan to modify must be:**
+- ✅ Cloned locally in your workspace directory
+- ✅ Accessible via local file paths
+- ✅ Registered in `~/.agentbus/services.json`
+
+**Important:** The orchestrator modifies files locally. It cannot work with remote repositories or services outside your workspace.
 
 ## Service Registry
 
