@@ -304,6 +304,23 @@ Example status.json:
 
 ---
 
+## Prerequisites
+
+### Load the AgentBus Skill First
+
+**Before using any AgentBus commands, initialize the skill** so the LLM understands the system:
+
+```
+/agentbus
+```
+
+This provides essential context about:
+- The 7-wave execution model
+- How to route to subskills
+- When to use AgentBus vs other skills
+
+**Without this step, the LLM won't know how to use the orchestrator properly.**
+
 ## Service Registry
 
 Global registry file: `~/.agentbus/services.json`

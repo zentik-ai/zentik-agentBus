@@ -95,7 +95,22 @@ workspace/
 
 ## Prerequisites
 
-None for core orchestration. Skills use `Task` tool for subagent spawning.
+### 1. Load the AgentBus Skill (Required First Step)
+
+Before using any AgentBus commands, **you must initialize the skill** so the LLM understands the system:
+
+```
+/agentbus
+```
+
+This loads the base skill which provides context about:
+- The 7-wave execution model
+- How to route to subskills (`agentbus orchestrator`, `agentbus review`)
+- When to use AgentBus vs other skills
+
+**Without this step, the LLM won't know how to use the orchestrator properly.**
+
+### 2. Service Registry Setup
 
 ## Service Registry
 

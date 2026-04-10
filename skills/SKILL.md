@@ -45,10 +45,20 @@ Wave 5:  Wrap-up (opt)       →  Git commits
 
 ## Quick Start Commands
 
-### Initialize a New Plan (with fuzzy service detection)
+### Step 1: Load the Skill (Required)
+
+**First, you must initialize the AgentBus skill** so the LLM understands the system:
 
 ```
-/agentbus-orchestrator "remove deprecated field from Tool model in tools and bot"
+/agentbus
+```
+
+This provides context about the 7-wave model, routing, and conventions.
+
+### Step 2: Initialize a New Plan
+
+```
+/agentbus orchestrator "remove deprecated field from Tool model in tools and bot"
 ```
 
 The orchestrator:
