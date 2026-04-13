@@ -1,7 +1,7 @@
 ---
 name: agentbus orchestrator
-description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow.
-version: 1.0.0
+description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow. Updated for Deep Mapping (5-document AGENTS/ folder).
+version: 2.0.0
 triggers: [agentbus plan, cross-service feature, multi-service orchestration]
 tools: [Read, Write, Bash, Glob, Grep, Task]
 tags: [agentbus, orchestrator, wave-based, coordination, microservices]
@@ -13,919 +13,150 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 **Skill Padre**: `agentbus` — Este es un subskill especializado invocado para coordinar waves.
 
-## Skill Base vs Orchestrator
-
-| | Skill Base (`agentbus/SKILL.md`) | Orchestrator (`agentbus orchestrator/SKILL.md`) |
-|---|---|---|
-| **Propósito** | Router/documentador. Decide si tu caso aplica para AgentBus. | Protocolo completo de ejecución. |
-| **Contenido** | Qué es, cuándo usar, comandos clave. | Waves, spawn de subagentes, manejo de errores. |
-| **Cuándo leer** | Primera vez usando AgentBus. | Cuando necesites detalles de implementación. |
-
-## Core Principle: Evidence Over Communication
-
-**Files are the source of truth.** You don't accumulate state—you read artifacts when you need to know the status.
+## Wave Flow (Updated for Deep Mapping)
 
 ```
-Wave 1: Service Mapping    →  AGENTS.md (understand service)
-Wave 2: Plan Refinement    →  PLAN.md (plan the change)
+Wave 1: Service Mapping    →  AGENTS/ (5 docs via map-codebase)
+Wave 1.5: Design Alignment →  Validated approach decisions
+Wave 2: Plan Refinement    →  PLAN.md
 Wave 3: Implementation     →  Code modified (no commits yet)
-Wave 4: Verification       →  TEST-RESULTS.md (verify it works)
+Wave 4: Verification       →  TEST-RESULTS.md
 Wave 5: Wrap-up (optional) →  Git commits + final deployment prep
-```
-
-## When to Use
-
-User invokes with descripción natural:
-
-```
-/agentbus-orchestrator "necesito modificar el endpoint de credits en el bot de WA y tools"
-```
-
-El orchestrator detecta automáticamente los servicios mencionados (ver "Service Detection" abajo).
-
-O para continuar:
-
-```
-/agentbus-orchestrator --continue 001-feature
 ```
 
 ## Service Detection & Fuzzy Matching
 
-### Algoritmo de Detección
-
-1. **Extrae candidatos** del prompt del usuario:
-   - Busca nombres de servicios, variaciones, o abreviaturas
-   - Ejemplos: "bot de WA" → "exitus-bot-wa", "tools" → "exitus-agent-tools"
-
-2. **Lee registry**: `~/.agentbus/services.json`
-
-3. **Fuzzy matching**:
-   - Match exacto: "exitus-bot-wa" → exitus-bot-wa
-   - Match parcial: "bot" → exitus-bot-wa (si es único)
-   - Match semántico: "bot de WA" → exitus-bot-wa
-   - Abreviaturas: "tools" → exitus-agent-tools
-
-4. **Resolución de conflictos**:
-   - Si hay múltiples matches, muestra opciones numeradas
-   - Si no hay matches claros, muestra todos los servicios disponibles
-
-### Interacción con Usuario
-
-**Caso A: Matches claros encontrados**
-
-```
-Usuario: /agentbus-orchestrator "modificar endpoint en bot de WA y tools"
-
-Orchestrator: Detecté posibles servicios:
-• "bot de WA" → exitus-bot-wa ✓
-• "tools" → exitus-agent-tools ✓
-
-¿Confirmas estos servicios? (yes/no/edit): _
-```
-
-**Caso B: Matches ambiguos**
-
-```
-Usuario: /agentbus-orchestrator "cambiar el api"
-
-Orchestrator: "api" podría ser:
-1. exitus-api-gateway
-2. exitus-agent-tools (tiene APIs)
-
-¿Cuál servicio(s)? (número(s) o nombre(s)): _
-```
-
-**Caso C: Sin matches**
-
-```
-Usuario: /agentbus-orchestrator "hacer algo"
-
-Orchestrator: No detecté servicios en tu mensaje.
-
-Servicios disponibles en registry:
-1. exitus-agent-tools  (/workspace/exitus-agent-tools)
-2. exitus-bot-wa       (/workspace/exitus-bot-wa)
-3. exitus-api-gateway  (/workspace/exitus-api-gateway)
-
-¿Cuáles usar? (números o nombres, separados por comas o espacios): _
-```
-
-### Implementación del Matching
-
-```python
-def detect_services(user_prompt, registry_services):
-    """
-    registry_services: dict from ~/.agentbus/services.json
-    Returns: list of matched service names
-    """
-    candidates = []
-    
-    # 1. Extraer tokens potenciales del prompt
-    #    (nombres propios, términos técnicos, etc.)
-    
-    # 2. Para cada servicio en registry, calcular score de match
-    for service_name in registry_services:
-        score = calculate_match_score(user_prompt, service_name)
-        if score > THRESHOLD:
-            candidates.append((service_name, score))
-    
-    # 3. Ordenar por score y retornar
-    return sorted(candidates, key=lambda x: x[1], reverse=True)
-
-def calculate_match_score(prompt, service_name):
-    """
-    Estrategias de matching:
-    - Exact match: 100 puntos
-    - Contiene substring: 80 puntos
-    - Palabra similar (Levenshtein): 60 puntos
-    - Abreviatura match: 70 puntos
-    """
-    prompt_lower = prompt.lower()
-    service_lower = service_name.lower()
-    
-    # Exact match
-    if service_name in prompt or service_lower in prompt_lower:
-        return 100
-    
-    # Substring match (ej: "bot" en "exitus-bot-wa")
-    parts = service_name.replace('-', ' ').replace('_', ' ').split()
-    for part in parts:
-        if part in prompt_lower and len(part) > 2:
-            return 80
-    
-    # Abreviaturas comunes
-    abbreviations = {
-        'tools': ['exitus-agent-tools', 'agent-tools'],
-        'bot': ['exitus-bot-wa', 'exitus-bot'],
-        'wa': ['exitus-bot-wa'],
-        'api': ['exitus-api-gateway'],
-        'gateway': ['exitus-api-gateway'],
-    }
-    
-    for abbr, services in abbreviations.items():
-        if abbr in prompt_lower and service_name in services:
-            return 70
-    
-    return 0
-```
-
-## Limitaciones
-
-- **Solo coordina, no implementa detalles de servicio**: La implementación específica va en `agentbus service agent`.
-- **No acumula estado en contexto**: Debe leer artefactos, no mantener estado en memoria.
-- **Requiere `agentbus service agent` disponible**: El subskill debe estar accesible para invocación vía Task tool.
-- **Wave 3 modifica código pero NO commitea**: Los commits son en Wave 5 (opcional) tras verificación exitosa.
-- **No toma decisiones de arquitectura**: Presenta opciones, el usuario decide.
-
-## Subagent Runtime (Cursor / Task Tool)
-
-**⚠️ Importante**: Para que los subagentes puedan escribir archivos, debes configurar correctamente el Task tool.
-
-### Configuración requerida
-
-```python
-Task(
-    subagent_name="agentbus service agent",  # o "coder" según tu entorno
-    description="Wave X: Task description",
-    prompt=json.dumps({
-        "wave": 1,
-        "service_name": "service-name",
-        "service_path": "/absolute/path/to/service",
-        "outputs": {
-            "agents_md": "/absolute/path/to/service/AGENTS.md",
-            "summary_json": "/absolute/path/to/orchestrator/service-outputs/service.json"
-        }
-    }),
-    # Flags IMPORTANTES para Cursor:
-    readonly=False,  # Permite escritura de archivos
-    # subagent_type="generalPurpose"  # Si tu entorno lo requiere
-)
-```
-
-### Fallback si subagentes no pueden escribir
-
-Si los subagentes reportan "Read-only mode":
-
-1. **Modo Manual**: Guía al usuario paso a paso:
-   ```
-   "El subagente no puede escribir en este modo. 
-    Por favor, ejecuta manualmente:
-    1. Crea archivo en {path}
-    2. Contenido: {...}"
-   ```
-
-2. **Modo Directo**: El orchestrator ejecuta las tareas directamente sin subagentes (más lento pero funciona).
+Uses fuzzy matching against `~/.agentbus/services.json`:
+- Exact match: 100 puntos
+- Substring match: 80 puntos
+- Abreviatura match: 70 puntos
 
 ## Execution Model: Sequential Waves, Parallel Services
 
-```
-Wave 1 (Mapping)
-  └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
-Wave 2 (Refinement)
-  └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
-Wave 3 (Implementation)
-  └─► Spawn N subagents in parallel ──► Wait ──► Read summaries ──► Update status
-Wave 4 (Verification)
-  └─► Spawn N subagents in parallel ──► Wait ──► Read reports ──► Global verify
-Wave 5 (Wrap-up - optional)
-  └─► Git commits, tags, deployment prep
-```
-
-Each wave is a separate invocation. You run Wave 1, wait for user to continue, then run Wave 2, etc.
-
-## End-to-End Workflow
-
-### Phase 1: Intake & Discovery
-
-1. **Parse request**
-   - Feature description completa del prompt del usuario
-   - Extrae candidatos de servicios usando "Service Detection & Fuzzy Matching" (ver sección arriba)
-   - Si no hay matches claros, muestra lista de servicios disponibles
-   - **NO asumas servicios** sin confirmación del usuario
-
-2. **Confirmar servicios con usuario**
-   - Muestra matches propuestos con explicación (ej: "bot de WA" → exitus-bot-wa)
-   - Espera confirmación: yes / no / edit
-   - Si editar: pide lista de servicios correctos
-   - Si no hay registry: guía al usuario a crear `~/.agentbus/services.json` primero
-
-3. **Detect service impact** (docs-first, post-confirmación)
-   - Read existing AGENTS.md from confirmed services (if exists)
-   - Read README.md, API.md, CLAUDE.md
-   - Search for code-signals: endpoints, event names, imports between services
-   - Propose list of affected services
-
-4. **User confirmation final**
-   - Write proposed services to temp file: `/tmp/agentbus-XXX-proposed-services.txt`
-   - Ask user to confirm/adjust
-   - Finalize service list
-
-### Phase 2: Plan ID Generation & Validation
-
-Before creating the plan, validate numbering consistency across all services.
-
-**5. Scan existing plans in each service:**
-   ```python
-   def get_next_plan_id(services, registry):
-       """
-       Finds the highest plan number across all services.
-       Returns next plan ID (e.g., '004-feature-name').
-       """
-       max_number = 0
-       all_plans = []
-       
-       for service in services:
-           service_path = registry[service]
-           plans_dir = f"{service_path}/.agentbus-plans"
-           
-           # List all plan directories (format: XXX-name)
-           if os.path.exists(plans_dir):
-               for entry in os.listdir(plans_dir):
-                   if os.path.isdir(f"{plans_dir}/{entry}"):
-                       # Extract number from start of name
-                       match = re.match(r'^(\d+)-', entry)
-                       if match:
-                           num = int(match.group(1))
-                           max_number = max(max_number, num)
-                           all_plans.append({
-                               'service': service,
-                               'plan': entry,
-                               'number': num
-                           })
-       
-       next_number = max_number + 1
-       return f"{next_number:03d}"
-   ```
-
-**6. Validate numbering consistency:**
-   - Check that there are no gaps in numbering (001, 002, 004 ← gap at 003)
-   - If gaps found: **warn user** but allow to continue
-   - If duplicate numbers found: **error** — require manual fix
-
-**7. Generate plan ID:**
-   - Use next sequential number: `004-feature-slug`
-   - **Confirm with user** before proceeding
-   
-   Example interaction:
-   ```
-   Plan ID propuesto: 004-modify-credits-endpoint
-   
-   Planes existentes encontrados:
-   - tools-service: 001-init, 002-auth-refactor, 003-api-changes
-   - bot-service: 001-init, 002-webhook-update
-   
-   ¿Confirmas crear el plan 004? (yes/no): _
-   ```
-
-### Phase 3: Initialize Plan Workspace
-
-8. **Create orchestrator workspace**:
-   ```
-   agentbus-orchestrator/001-feature-slug/
-   ├── status.json
-   ├── SEED-PLAN.md
-   └── service-outputs/
-   ```
-
-9. **Write SEED-PLAN.md** with:
-   - Feature description
-   - One section per service with initial understanding
-   - Cross-service interactions (guessed)
-
-10. **Initialize status.json**:
-   ```json
-   {
-     "plan_id": "001-remove-field",
-     "feature_slug": "remove-field",
-     "services": ["tools-service", "bot-service"],
-     "status": "initialized",
-     "current_wave": null,
-     "waves": {
-       "wave_1_mapping": {"status": "ready"},
-       "wave_2_refinement": {"status": "pending"},
-       "wave_3_implementation": {"status": "pending"},
-       "wave_4_verification": {"status": "pending"},
-       "wave_5_wrapup": {"status": "pending", "optional": true}
-     }
-   }
-   ```
-
-11. **Report to user**: "Wave 1 ready. Run orchestrator again to start mapping."
-
-### Phase 4: Wave 1 — Service Mapping
-
-12. **Check status.json**: Verify wave 1 is "ready"
-
-13. **Launch parallel subagents**:
-   ```python
-   for service in services:
-       Task(
-           subagent_name="agentbus service agent",
-           description=f"Wave 1: Map {service}",
-           prompt=json.dumps({
-               "wave": 1,
-               "service_name": service,
-               "service_path": f"/workspace/{service}",
-               "outputs": {
-                   "agents_md": f"/workspace/{service}/AGENTS.md",
-                   "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-               }
-           }),
-           readonly=False  # IMPORTANTE: Permitir escritura
-       )
-   ```
-
-14. **Wait** for all subagents to complete
-
-15. **Read** summary JSON files from `service-outputs/`
-
-16. **Update status.json**:
-    - Mark wave 1 as "completed"
-    - Record artifact paths
-    - Mark wave 2 as "ready"
-
-17. **Report**: Summary of AGENTS.md created/updated
-
-### Phase 5: Wave 2 — Plan Refinement
-
-18. **Check status.json**: Verify wave 1 is "completed"
-
-19. **Launch parallel subagents**:
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 2: Refine plan for {service}",
-        prompt=json.dumps({
-            "wave": 2,
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "agents_md": f"/workspace/{service}/AGENTS.md",
-                "seed_plan": f"/workspace/agentbus-orchestrator/{plan_id}/SEED-PLAN.md"
-            },
-            "outputs": {
-                "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
-
-20. **Wait**, **read** summaries
-
-21. **Detect Context Queries Needed**:
-    ```python
-    # Check each summary for status: "needs_context"
-    pending_queries = []
-    for service in services:
-        summary = read_json(f"service-outputs/{service}.json")
-        if summary.get("status") == "needs_context":
-            pending_queries.append({
-                "requesting_service": service,
-                "queries": summary.get("context_queries", [])
-            })
-    ```
-
-22. **If Context Queries Pending**:
-    
-    **Report to user**:
-    ```
-    Wave 2 PARCIALMENTE completada.
-    
-    Servicios con planes listos:
-    ✓ sales-crm-ui — PLAN.md completo
-    
-    Servicios que necesitan contexto externo:
-    ⚠ exitus-crm-cronjob-api
-      
-      Queries pendientes:
-      • users-api — "What is the exact shape of GET /users/{id} response?"
-        Justificación: "Need to know if branch_name is in org.branch_name or direct"
-    
-    ¿Ejecutar context queries para obtener información adicional? (yes/skip): _
-    ```
-    
-    **If user says "yes"**:
-    
-    23. **Execute Context Queries**:
-        ```python
-        # Collect all unique target services
-        target_services = set()
-        for item in pending_queries:
-            for query in item["queries"]:
-                target_services.add(query["target_service"])
-        
-        # Spawn query-only agents for each target service
-        for target_service in target_services:
-            Task(
-                subagent_name="agentbus service agent",
-                description=f"Context Query: {target_service}",
-                prompt=json.dumps({
-                    "mode": "context_query",
-                    "target_service": target_service,
-                    "service_path": f"/workspace/{target_service}",
-                    "questions": [q for q in all_queries if q.target == target_service],
-                    "inputs": {
-                        "agents_md": f"/workspace/{target_service}/AGENTS.md"
-                    }
-                }),
-                readonly=True  # Query-only, no writes
-            )
-        ```
-    
-    24. **Collect Query Results**:
-        ```python
-        context_results = {}
-        for target_service in target_services:
-            result = read_json(f"service-outputs/{target_service}-query.json")
-            context_results[target_service] = result
-        ```
-    
-    25. **Re-run Wave 2 with Context**:
-        ```python
-        # Re-run only services that needed context
-        for service_info in pending_queries:
-            service = service_info["requesting_service"]
-            
-            # Get relevant context for this service
-            service_context = {}
-            for query in service_info["queries"]:
-                target = query["target_service"]
-                if target in context_results:
-                    service_context[target] = context_results[target]
-            
-            Task(
-                subagent_name="agentbus service agent",
-                description=f"Wave 2 (with context): Refine plan for {service}",
-                prompt=json.dumps({
-                    "wave": 2,
-                    "mode": "plan_refinement_with_context",
-                    "service_name": service,
-                    "service_path": f"/workspace/{service}",
-                    "inputs": {
-                        "agents_md": f"/workspace/{service}/AGENTS.md",
-                        "seed_plan": f"/workspace/agentbus-orchestrator/{plan_id}/SEED-PLAN.md",
-                        "previous_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                        "context_from_queries": service_context
-                    },
-                    "outputs": {
-                        "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                        "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-                    }
-                }),
-                readonly=False
-            )
-        ```
-    
-    26. **Wait for completion** and update status
-
-    **If user says "skip"**:
-    - Mark Wave 2 as "completed_with_warnings"
-    - Note in status.json that context was skipped
-    - Proceed with provisional plans
-
-27. **Update status.json**: Mark wave 2 as "completed"
-
-28. **Final Report**: Summary of all plans (with or without context)
+Each wave spawns N subagents in parallel, waits, reads summaries, updates status.
 
 ---
 
-### Phase 6: Wave 3 — Implementation
+## End-to-End Workflow
 
-29. **Confirm with user**:
-    - "Wave 3 will modify source code files but NOT commit them."
-    - "Ensure you're on a feature branch."
-    - "¿Proceder? (yes/no)"
+### Phase 4: Wave 1 — Service Mapping (Deep Mapping)
 
-30. **Check status.json**: Verify wave 2 is "completed"
+Launch `agentbus map-codebase` for each service:
 
-31. **Launch parallel subagents**:
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 3: Implement changes for {service}",
-        prompt=json.dumps({
-            "wave": 3,
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                "agents_md": f"/workspace/{service}/AGENTS.md"
-            },
-            "outputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
-
-32. **Wait**, **read** summaries, **update** status.json
-
-33. **Report**: Summary of changes made (files modified, NO commits yet)
-
-### Phase 7: Wave 4 — Verification
-
-34. **Check status.json**: Verify wave 3 is "completed"
-
-35. **Launch parallel subagents**:
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 4: Verify implementation for {service}",
-        prompt=json.dumps({
-            "wave": 4,
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "other_services": [s for s in services if s != service]
-            },
-            "outputs": {
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
-
-36. **Wait**, **read** summaries
-
-37. **Read** all TEST-RESULTS.md files for global verification
-
-38. **Run Global Verification**:
-    - All services pass tests
-    - Cross-service dependencies work
-    - API contracts are respected
-
-39. **Update status.json**: Mark wave 4 as "completed"
-
-40. **Report**: Test results summary, readiness status
-
-### Phase 8: Wave 4b — Adjustments & Clarifications (Optional)
-
-**Purpose**: Minor tweaks, fixes, and clarifications after verification—no full replanning needed
-
-**When to use**:
-- Some tests failed with minor issues (typos, wrong mocks, small logic errors)
-- You want to understand what changed and how it works now
-- Quick questions about the implementation
-- Small adjustments that don't require a new PLAN.md
-
-**Not for**:
-- Major architectural changes (that would be a new plan)
-- Adding significant new features
-- Breaking API changes
-
-**Interaction Example**:
-
-```
-Wave 4 completada — Test Results:
-✓ sales-crm-ui: 12/12 pass
-⚠ exitus-crm-cronjob-api: 10/12 pass
-  - test_validation_email: FAILED
-  - test_branch_lookup: FAILED
-
-¿Ajustes o preguntas? (yes/no): yes
-
-[Opciones disponibles]
-1. Explicar fallo — "¿Por qué falla test_validation_email?"
-2. Ajuste rápido — "Arregla la validación de email"
-3. Re-correr tests — "Re-run tests en cronjob-api"
-4. Listo — Continuar a Wave 5
-
-Tu elección: 1
-
-[Service-agent investiga y explica]
-"El test falla porque el mock no incluye el campo 'branch_name' 
- que ahora espera la validación."
-
-¿Solicitar ajuste? (yes/no): yes
-→ Spawnea adjustment agent
-→ Modifica mock en test
-→ Re-run test_validation_email
-→ ✅ PASS
-
-¿Más ajustes? (yes/no): no
-→ Listo para Wave 5
+```python
+Task(
+    subagent_name="agentbus map-codebase",
+    description=f"Wave 1: Deep map {service}",
+    prompt=json.dumps({
+        "service_name": service,
+        "service_path": f"/workspace/{service}",
+        "outputs": {
+            "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
+            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+        }
+    }),
+    readonly=False
+)
 ```
 
-**41. Detect if Adjustments Needed**:
-    ```python
-    # Read all TEST-RESULTS.md
-    for service in services:
-        results = read_test_results(service)
-        if results["failed_tests"] > 0:
-            suggest_adjustment_phase = True
-    ```
+Generates 5 documents per service:
+- STACK.md — Technology stack
+- ARCHITECTURE.md — Patterns and data flow
+- STRUCTURE.md — Directory layout
+- CONVENTIONS.md — Implementation patterns (CRITICAL)
+- CONCERNS.md — Tech debt and risks
 
-**42. Offer Adjustment Phase**:
-    ```
-    Wave 4b: Adjustments & Clarifications
-    
-    Servicios con tests fallidos:
-    • cronjob-api — 2 tests fallando
-    
-    Servicios que pasaron todos:
-    • sales-crm-ui — ✅ 12/12 pass
-    
-    Opciones:
-    [a] Ajustes — Revisar y arreglar fallos menores
-    [p] Preguntas — Entender qué cambió y cómo funciona
-    [s] Skip — Continuar a Wave 5 (commits) con fallos conocidos
-    
-    Tu elección: _
-    ```
+### Phase 5: Wave 1.5 — Design Alignment Checkpoint
 
-**43. If Adjustments Selected**:
+Validates that approaches in SEED-PLAN match patterns in CONVENTIONS.md.
 
-    **Modo "Explain"** (preguntas al usuario):
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 4b Explain: Clarify {service}",
-        prompt=json.dumps({
-            "mode": "explain",
-            "wave": "4b",
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
-            },
-            "question": "[User's question, e.g., 'Why does test X fail?']"
-        }),
-        readonly=True
-    )
-    ```
-    
-    Agent returns explanation, no file changes.
+**Heuristics applied:**
+| Scenario | Preferred Approach |
+|----------|-------------------|
+| Schema change (ALTER TABLE) | Migration |
+| Dynamic data (permissions) | API Endpoint |
+| Environment-specific values | API/Config |
+| Static reference data | Migration/Seed |
 
-**44. If Quick Fix Selected**:
+If conflicts detected, presents to user:
+```
+═══════════════════════════════════════════════════════════════
+  DESIGN ALIGNMENT CHECKPOINT
+═══════════════════════════════════════════════════════════════
 
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 4b Fix: Quick adjustment for {service}",
-        prompt=json.dumps({
-            "mode": "quick_fix",
-            "wave": "4b",
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
-            },
-            "fix_request": "[User's fix request, e.g., 'Fix mock in test X']",
-            "outputs": {
-                "changes_log_append": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}-4b.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
-    
-    Agent makes small code changes, appends to CHANGES.md.
+Servicio: [service]
+Cambio: [description]
 
-**45. Re-run Tests After Fix** (optional):
+Approach propuesto: [A]
+Alternativa detectada: [B]
+Sugerencia: [B]
 
-    ```python
-    # Only for services that were adjusted
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 4b Re-test: {service}",
-        prompt=json.dumps({
-            "wave": 4,
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md"
-            },
-            "outputs": {
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
+Opciones:
+  [A] Mantener approach propuesto
+  [B] Usar alternativa (recomendado)
+  [C] Otra: _
 
-**46. Update CHANGES.md**:
-    - Append adjustments to existing CHANGES.md
-    - Mark as "Adjustment from Wave 4b"
+Tu elección: _
+```
 
-**47. Loop Until User Satisfied**:
-    - Ask: "¿Más ajustes o pasar a Wave 5?"
-    - Continue until user says "done"
+Records decision in `service-outputs/{service}-dac.json`
 
-**48. Update status.json**: Mark wave 4b as "completed" or "skipped"
+### Phase 6: Wave 2 — Plan Refinement
 
-### Phase 9: Wave 5 — Wrap-up (Optional)
+Launch `agentbus service agent` with inputs:
+- `agents_dir` — Path to 5 AGENTS/ documents
+- `seed_plan` — Original/adjusted plan
+- `design_decisions` — Wave 1.5 decisions (optional)
 
-**Only run after user confirmation that everything looks good.**
+### Phase 7: Wave 3 — Implementation
 
-41. **Confirm with user**:
-    - "Wave 5 will create git commits for all changes."
-    - "This is the point of no return."
-    - "¿Proceder con commits? (yes/no)"
+Launch `agentbus service agent` to modify code (no commits).
 
-42. **Launch parallel subagents**:
-    ```python
-    Task(
-        subagent_name="agentbus service agent",
-        description=f"Wave 5: Create commits for {service}",
-        prompt=json.dumps({
-            "wave": 5,
-            "service_name": service,
-            "service_path": f"/workspace/{service}",
-            "inputs": {
-                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-                "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
-            },
-            "outputs": {
-                "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/COMMITS.md",
-                "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-            }
-        }),
-        readonly=False
-    )
-    ```
+### Phase 8: Wave 4 — Verification
 
-43. **Wait**, **read** summaries
+Launch `agentbus service agent` to run tests and verify.
 
-44. **Write Final Artifacts**:
-    - `DEPLOY-ORDER.md` — Rollout sequence with verified commits
+### Phase 9: Wave 4b — Adjustments (Optional)
 
-45. **Update status.json**: Mark as "completed"
+Explain mode or quick_fix mode for minor adjustments.
 
-46. **Final Report**:
-    - Implementation status per service
-    - Commit hashes
-    - Deploy readiness
-    - Recommended next step: deploy to staging/production
+### Phase 10: Wave 5 — Wrap-up (Optional)
 
-## Error Handling & Retries
+Create git commits after user confirmation.
 
-### If a subagent fails
+---
 
-1. Read its summary JSON for error details
-2. Update status.json:
-   ```json
-   {
-     "services": {
-       "bot-service": {
-         "status": "failed",
-         "error": "...",
-         "retries": 1
-       }
-     }
-   }
-   ```
-3. Report failure to user
-4. On retry: Re-run orchestrator for same wave (subagent will overwrite artifacts)
-
-### If subagent reports "Read-only mode"
-
-1. **Intentar modo fallback**:
-   ```python
-   # Reintentar con configuración diferente
-   Task(
-       subagent_name="coder",  # Probar con otro tipo
-       description=f"Wave X: {service} (fallback mode)",
-       prompt=...,
-       readonly=False  # Asegurar que está en False
-   )
-   ```
-
-2. **Si sigue fallando, modo manual**:
-   - Reporta al usuario: "Los subagentes no pueden escribir en este modo."
-   - Proporciona instrucciones manuales paso a paso.
-   - O ejecuta las tareas directamente tú (orchestrator).
-
-### If user wants to add service mid-flight
-
-1. Update status.json to add service
-2. Mark current wave as "needs_update" for that service
-3. Re-run orchestrator for that wave
-4. Only the new service gets processed
-
-### If you need to resume
-
-1. Read status.json
-2. Determine current wave from status
-3. Continue from there
-
-## Status.json Schema
+## Status.json Schema (Updated)
 
 ```json
 {
   "plan_id": "001-feature",
-  "feature_slug": "feature",
-  "feature_description": "...",
   "services": ["svc1", "svc2"],
-  "status": "in_progress",
   "current_wave": 2,
   "waves": {
     "wave_1_mapping": {
       "status": "completed",
       "artifacts": {
         "svc1": {
-          "agents_md": "/workspace/svc1/AGENTS.md",
-          "summary_json": ".../svc1.json"
+          "agents_dir": "/workspace/svc1/.agentbus/AGENTS",
+          "documents": ["STACK.md", "ARCHITECTURE.md", "STRUCTURE.md", "CONVENTIONS.md", "CONCERNS.md"]
         }
       }
     },
-    "wave_2_refinement": {
-      "status": "in_progress",
-      "artifacts": {}
+    "wave_1_5_design_alignment": {
+      "status": "completed",
+      "decisions_made": 1
     },
-    "wave_3_implementation": {
-      "status": "pending"
-    },
-    "wave_4_verification": {
-      "status": "pending"
-    },
-    "wave_5_wrapup": {
-      "status": "pending",
-      "optional": true
-    }
+    "wave_2_refinement": {"status": "in_progress"},
+    "wave_3_implementation": {"status": "pending"},
+    "wave_4_verification": {"status": "pending"},
+    "wave_5_wrapup": {"status": "pending", "optional": true}
   }
 }
 ```
 
-## Global Verification Checklist
-
-After Wave 4, read all TEST-RESULTS.md and verify:
-
-- [ ] All services pass their tests
-- [ ] Dependencies: If Service A lists dependency on B, Service B acknowledges
-- [ ] API contracts: Breaking changes documented by producer AND consumer
-- [ ] Deploy order: No circular dependencies
-- [ ] Open questions: All have owners assigned
-
-If any check fails, report which services need re-processing.
-
-## Output Artifacts
-
-You produce:
-1. **status.json** — Tracking for resume/retry
-2. **SEED-PLAN.md** — Initial vision
-3. **DEPLOY-ORDER.md** — Rollout sequence (final)
-
 ## Anti-Patterns
 
-❌ **Don't**: Accumulate detailed knowledge in your context
-❌ **Don't**: Ask subagents to return data in response text
-❌ **Don't**: Write implementation details in status.json
-❌ **Don't**: Assume services without AGENTS.md are unimportant
-❌ **Don't**: Spawn subagents without `readonly=False` if they need to write
-✅ **Do**: Read artifacts when you need to know something
-✅ **Do**: Write clear, actionable final reports
-✅ **Do**: Let subagents own service-level details
-✅ **Do**: Confirm with user before destructive operations (Wave 3, Wave 5)
+- Don't skip Wave 1.5 without user explicit consent
+- Don't spawn subagents without `readonly=False` if they need to write
+- Don't accumulate state in context — read artifacts instead
