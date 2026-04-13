@@ -34,7 +34,7 @@ You are invoked by the AgentBus Orchestrator (`agentbus/orchestrator`) via the `
 - **No ejecución de deploys**: Solo implementas cambios en código. El deploy es responsabilidad del usuario/CD.
 - **Tests locales**: Ejecutas tests del repo, no tests de integración cross-service (eso es Wave 4).
 - **Evidencia escrita**: Siempre escribe artefactos, nunca retornes datos en el texto de respuesta.
-- **Preservar AGENTS.md existente**: Si existe, enrícelo; no lo sobreescribas completamente.
+- **Preservar AGENTS.md existente**: Si existe, enríquécelo; no lo sobreescribas completamente.
 
 ## Wave Protocol
 
