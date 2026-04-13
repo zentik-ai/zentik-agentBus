@@ -1,7 +1,7 @@
 ---
 name: agentbus service agent
-description: Service-level specialist subagent for AgentBus. Maps codebase (via map-codebase), refines plans, implements changes (no commits), and verifies results. Uses 5-document AGENTS/ structure.
-version: 2.1.0
+description: Service-level specialist subagent for AgentBus. Flexible execution of waves with mode-based instructions. Uses 5-document AGENTS/ structure.
+version: 2.2.0
 triggers: [agentbus wave execution, service mapping, plan refinement, implementation, verification]
 tools: [Read, Write, Bash, Glob, Grep]
 tags: [agentbus, service-agent, mapping, refinement, implementation, verification, single-service]
@@ -9,455 +9,390 @@ tags: [agentbus, service-agent, mapping, refinement, implementation, verificatio
 
 # AgentBus Service Agent
 
-Specialist subagent that works on a single microservice within the AgentBus cross-service planning system.
+Specialist subagent that works on a single microservice. Executes tasks based on **mode** and **specific instructions** received from the orchestrator.
 
-**Skill Padre**: `agentbus` — Este es un subskill especializado invocado vía Task tool por `agentbus orchestrator`.
+**Skill Padre**: `agentbus` — Este es un subskill especializado invocado vía Task tool.
 
-## Core Principle: Read Before Acting
+## Core Principle: Mode + Instructions
 
-**You receive explicit reading instructions in the prompt.** Follow them exactly.
+You receive:
+1. **Base Context** — Where files are located
+2. **Mode** — What type of task this is
+3. **Specific Instructions** — What to do in this particular case
 
-The orchestrator tells you:
-1. **Which files to read** (`read_files` section)
-2. **In what order** (`read_instructions` section)
-3. **Why each matters** (explanations in prompt)
-4. **Where to write output** (`output_files` section)
-
----
-
-## Input Processing
-
-When spawned, you receive a JSON prompt. Parse it to extract:
-
-```python
-# Example input structure
-{
-  "mission": "Create detailed implementation plan",
-  "wave": 2,
-  "service": {"name": "service-name", "path": "/workspace/service"},
-  "read_files": {
-    "agents_dir": "/workspace/service/.agentbus/AGENTS",
-    "required_documents": ["CONVENTIONS.md", "ARCHITECTURE.md", ...],
-    "seed_plan": "/path/to/SEED-PLAN.md"
-  },
-  "read_instructions": {
-    "step_1": "Read CONVENTIONS.md first",
-    "step_2": "Read ARCHITECTURE.md",
-    ...
-  },
-  "output_files": {
-    "refined_plan": "/path/to/PLAN.md",
-    "summary_json": "/path/to/summary.json"
-  }
-}
-```
-
-**Your first action**: Parse the prompt and identify ALL read_files.
+**Your job**: Execute according to mode's base behavior + specific instructions.
 
 ---
 
-## Wave Protocol
+## Input Structure
 
-### Wave 1: Service Mapping
-
-**Note**: Wave 1 is handled by `agentbus map-codebase`. You may be invoked for enrichment if needed.
-
----
-
-### Wave 2: Plan Refinement
-
-**Input Parse**:
-```json
-{
-  "mission": "Create detailed implementation plan",
-  "wave": 2,
-  "service": {"name": "...", "path": "..."},
-  "read_files": {
-    "agents_dir": "/workspace/service/.agentbus/AGENTS",
-    "required_documents": {
-      "CONVENTIONS.md": "MOST IMPORTANT - contains decision patterns",
-      "ARCHITECTURE.md": "Understand patterns and data flow",
-      "STRUCTURE.md": "Know where to place files",
-      "STACK.md": "Technology constraints",
-      "CONCERNS.md": "Things to avoid"
-    },
-    "seed_plan": "/workspace/orchestrator/001-feature/SEED-PLAN.md",
-    "design_decisions": "/workspace/orchestrator/001-feature/service-dac.json"
-  },
-  "read_instructions": {
-    "step_1": "Read CONVENTIONS.md first - identify available patterns",
-    "step_2": "Read ARCHITECTURE.md - understand how components interact",
-    "step_3": "Read SEED-PLAN.md - understand what needs to be built",
-    "step_4": "Cross-reference: Does SEED-PLAN approach match CONVENTIONS patterns?",
-    "step_5": "Read STRUCTURE.md - determine exact file locations"
-  }
-}
-```
-
-**Execution Steps**:
-
-**STEP 1: Read CONVENTIONS.md**
-```python
-conventions = read_file(f"{agents_dir}/CONVENTIONS.md")
-# Extract:
-# - Available patterns
-# - Decision matrix (when to use what)
-# - Examples from codebase
-```
-
-**STEP 2: Read ARCHITECTURE.md**
-```python
-architecture = read_file(f"{agents_dir}/ARCHITECTURE.md")
-# Extract:
-# - Architectural patterns
-# - Layer boundaries
-# - Data flow
-```
-
-**STEP 3: Read SEED-PLAN.md**
-```python
-seed_plan = read_file(seed_plan_path)
-# Extract:
-# - Feature description for this service
-# - Proposed approach
-# - Changes needed
-```
-
-**STEP 4: Cross-Reference (CRITICAL)**
-```python
-# Check: Does SEED-PLAN approach match CONVENTIONS patterns?
-# Example:
-#   SEED-PLAN says: "Create SQL migration for permission"
-#   CONVENTIONS.md says: "Dynamic permissions → use API endpoint"
-#   → Potential mismatch detected
-```
-
-**STEP 5: Read STRUCTURE.md**
-```python
-structure = read_file(f"{agents_dir}/STRUCTURE.md")
-# Extract:
-# - Where to create new files
-# - Naming conventions
-# - Directory layout
-```
-
-**STEP 6: Create PLAN.md**
-
-Use template:
-```markdown
-# Plan: {feature-name} ({plan-id})
-
-## Service: {service-name}
-
-### Overview
-[What this feature does in this service]
-
-### Approach Selected
-[Which pattern from CONVENTIONS.md and why]
-
-### Cross-Reference Check
-- [ ] SEED-PLAN approach reviewed against CONVENTIONS.md
-- [ ] Pattern selected: [pattern name from CONVENTIONS.md]
-- [ ] Justification: [why this pattern fits]
-
-### Changes Required
-
-#### 1. [Change Category]
-- Files: `[path1]`, `[path2]`
-- Action: [Specific change]
-- Pattern from CONVENTIONS.md: [Which pattern, why appropriate]
-- Rollback: [How to undo]
-
-### Testing Strategy
-- Unit: [files]
-- Integration: [files]
-
-### Dependencies
-- Other services: [list]
-- Order requirements: [e.g., "Must deploy after X"]
-
-### Rollback Plan
-[Steps to revert]
-```
-
-**STEP 7: Write Summary JSON**
 ```json
 {
   "wave": 2,
-  "status": "completed|needs_context|failed",
-  "artifacts_written": ["PLAN.md path"],
-  "approach_selected": "[pattern from CONVENTIONS.md]",
-  "if_needs_context": {
-    "queries": [...]
-  }
-}
-```
-
----
-
-### Wave 2: Context Queries (Optional)
-
-**When**: You need info from other services to complete plan.
-
-**Action**: Write PLAN provisional + Summary with `status: "needs_context"`.
-
-**Do NOT guess** — explicitly request context.
-
----
-
-### Wave 3: Implementation
-
-**Input Parse**:
-```json
-{
-  "mission": "Execute PLAN.md - modify code, run tests, NO commits",
-  "wave": 3,
   "service": {"name": "...", "path": "..."},
-  "read_files": {
-    "plan": "/workspace/service/.agentbus-plans/001-feature/PLAN.md",
-    "agents_dir": "/workspace/service/.agentbus/AGENTS",
-    "key_documents": ["CONVENTIONS.md", "STRUCTURE.md"]
+  "base_context": {
+    "agents_dir": "...",
+    "plan": "..."
   },
-  "read_instructions": {
-    "step_1": "Read PLAN.md completely - understand all changes",
-    "step_2": "Read CONVENTIONS.md - verify approach is still appropriate",
-    "step_3": "Read STRUCTURE.md - confirm file locations",
-    "step_4": "For each change in PLAN: implement, test, proceed"
+  "mode": "plan_refinement",
+  "instructions": {
+    "goal": "...",
+    "constraints": ["..."],
+    "focus_areas": ["..."]
   },
-  "execution_rules": {
-    "no_commits": true,
-    "test_after_each_change": true,
-    "stop_on_test_failure": true
-  }
-}
-```
-
-**Execution Steps**:
-
-**STEP 1: Read PLAN.md**
-```python
-plan = read_file(plan_path)
-# Parse all changes required
-```
-
-**STEP 2: Verify Environment**
-```bash
-git branch  # Must be feature branch
-git status  # Working directory state
-```
-
-**STEP 3: Execute Changes (One by One)**
-```python
-for change in plan.changes:
-    # 1. Read target file
-    content = read_file(change.file_path)
-    
-    # 2. Apply modification
-    new_content = apply_change(content, change)
-    
-    # 3. Write file
-    write_file(change.file_path, new_content)
-    
-    # 4. Run relevant tests
-    test_result = run_tests(change.test_command)
-    
-    # 5. If tests fail, STOP and report
-    if not test_result.passed:
-        return {
-            "status": "failed",
-            "error": f"Tests failed after modifying {change.file_path}",
-            "test_output": test_result.output
-        }
-```
-
-**STEP 4: Write CHANGES.md**
-```markdown
-# Changes Log: {plan-id}
-
-## Service: {service-name}
-
-### Files Modified
-
-| File | Change | Tests | Status |
-|------|--------|-------|--------|
-| `src/api/tools.ts` | [description] | ✅ unit, ✅ integration | Ready |
-
-### Suggested Commits (for Wave 5)
-```bash
-git add [files]
-git commit -m "..."
-```
-```
-
-**STEP 5: Write Summary JSON**
-```json
-{
-  "wave": 3,
-  "status": "completed|failed|partial",
-  "files_modified": [...],
-  "tests": {"unit": {"run": 5, "passed": 5}},
-  "ready_for_commit": true
-}
-```
-
----
-
-### Wave 4: Verification
-
-**Input Parse**:
-```json
-{
-  "mission": "Run full test suite and verify production readiness",
-  "wave": 4,
-  "service": {"name": "...", "path": "..."},
-  "read_files": {
-    "changes_log": "/workspace/service/.agentbus-plans/001-feature/CHANGES.md",
-    "plan": "/workspace/service/.agentbus-plans/001-feature/PLAN.md"
-  },
-  "verification_checklist": [
-    "All unit tests pass",
-    "All integration tests pass",
-    "Code follows project conventions"
-  ]
-}
-```
-
-**Execution**:
-1. Read CHANGES.md and PLAN.md
-2. Run full test suite
-3. Verify all PLAN items completed
-4. Write TEST-RESULTS.md
-5. Write Summary JSON
-
----
-
-### Wave 4b: Adjustments
-
-**Modes**: `explain` or `quick_fix`
-
-**Input Parse**:
-```json
-{
-  "mission": "Apply quick fix to address test failure",
-  "wave": "4b",
-  "mode": "quick_fix",
-  "service": {"name": "...", "path": "..."},
-  "read_files": {
+  "output": {
     "plan": "...",
-    "changes_log": "...",
-    "test_results": "..."
-  },
-  "fix_request": "[User's specific request]"
+    "summary": "..."
+  }
+}
+```
+
+---
+
+## Modes Reference
+
+### Mode: `plan_refinement` (Wave 2)
+
+**Base Behavior**:
+1. Read CONVENTIONS.md (decision patterns)
+2. Read ARCHITECTURE.md (structure)
+3. Read SEED-PLAN.md (what to build)
+4. Cross-reference approach
+5. Write detailed PLAN.md
+
+**Specific Instructions May Include**:
+- `focus_on`: ["api_endpoints", "database_changes"]
+- `skip`: ["frontend_changes"]
+- `validate_against_conventions`: true/false
+
+**Execution**:
+```python
+# 1. Follow base behavior
+conventions = read_file(f"{base_context.agents_dir}/CONVENTIONS.md")
+architecture = read_file(f"{base_context.agents_dir}/ARCHITECTURE.md")
+seed_plan = read_file(base_context.seed_plan)
+
+# 2. Apply specific instructions
+if "focus_on" in instructions:
+    focus_areas = instructions["focus_on"]
+    
+# 3. Write output
+write_file(output.plan, plan_content)
+write_file(output.summary, summary_json)
+```
+
+---
+
+### Mode: `adjustment` (Wave 2b/4b)
+
+**For**: Minor modifications to existing plans.
+
+**Base Behavior**:
+1. Read existing PLAN.md
+2. Read AGENTS/ docs
+3. Apply specific adjustment
+4. Update PLAN.md in place
+
+**Specific Instructions May Include**:
+- `goal`: What to adjust
+- `base_plan`: Context of existing plan
+- `constraints`: What to preserve
+- `files_to_modify`: Specific files
+
+**Example**:
+```json
+{
+  "mode": "adjustment",
+  "instructions": {
+    "goal": "Add pagination to GET /analytics/jobs",
+    "base_plan": "Existing PLAN.md is correct, just add pagination",
+    "pagination_requirements": {
+      "page_param": "page",
+      "default_size": 20
+    }
+  }
 }
 ```
 
 **Execution**:
-1. Read all input files
+```python
+# 1. Read existing plan
+existing_plan = read_file(base_context.existing_plan)
+
+# 2. Read conventions for patterns
+conventions = read_file(f"{base_context.agents_dir}/CONVENTIONS.md")
+
+# 3. Apply adjustment
+new_plan = existing_plan + pagination_section
+
+# 4. Write updated plan
+write_file(output.plan, new_plan)
+```
+
+---
+
+### Mode: `implementation` (Wave 3)
+
+**Base Behavior**:
+1. Read PLAN.md
+2. Read CONVENTIONS.md
+3. Implement changes one by one
+4. Test after each change
+5. Write CHANGES.md
+
+**Specific Instructions May Include**:
+- `no_commits`: Always true for Wave 3
+- `test_each_change`: true/false
+- `priority_order`: Which changes first
+
+---
+
+### Mode: `verification` (Wave 4)
+
+**Base Behavior**:
+1. Read CHANGES.md
+2. Run full test suite
+3. Verify against PLAN.md
+4. Write TEST-RESULTS.md
+
+---
+
+### Mode: `quick_fix` (Wave 4b)
+
+**For**: Small fixes after verification.
+
+**Base Behavior**:
+1. Read CHANGES.md and TEST-RESULTS.md
 2. Understand the problem
 3. Apply minimal fix
-4. Re-run affected tests
+4. Re-run tests
 5. Append to CHANGES.md
-6. Report results
 
----
+**Specific Instructions Must Include**:
+- `problem`: What's broken
+- `fix`: What to do
 
-### Wave 5: Wrap-up
-
-**Input Parse**:
+**Example**:
 ```json
 {
-  "mission": "Create git commits for all verified changes",
-  "wave": 5,
-  "pre_flight_requirements": [
-    "User explicitly confirmed commits",
-    "On feature branch"
-  ],
-  "read_files": {
-    "changes_log": "...",
-    "test_results": "..."
+  "mode": "quick_fix",
+  "instructions": {
+    "problem": "test_validation_email fails - missing branch_name in mock",
+    "fix": "Add org.branch_name to mock response",
+    "file": "tests/test_validation.py"
   }
 }
 ```
 
-**Execution**:
-1. Verify pre-flight requirements
-2. Read CHANGES.md for commit list
-3. Create commits
-4. Write COMMITS.md
-5. Report hashes
+---
+
+### Mode: `context_query` (Wave 2b)
+
+**For**: Gathering info from other services.
+
+**Base Behavior**:
+1. Read AGENTS/ docs
+2. Find answers to questions
+3. Return structured response
+
+**Specific Instructions Must Include**:
+- `questions`: List of questions to answer
 
 ---
 
-## Using CONVENTIONS.md Effectively
+### Mode: `custom`
 
-CONVENTIONS.md is your decision guide. It contains:
+**For**: Any scenario not covered by standard modes.
 
-1. **Patterns**: Available approaches for common tasks
-2. **Decision Matrix**: Which to use when
-3. **Examples**: Real code from the codebase
+**Behavior**: Follow `instructions.complete_instructions` exactly.
 
-### Example Workflow
-
-```
-Need to add a new permission?
-→ Open CONVENTIONS.md
-→ Find "Data Modification Patterns"
-→ Check Decision Matrix:
-   "Dynamic permissions → API Endpoint"
-→ Read Pattern B details
-→ Implement following the pattern
+**Example**:
+```json
+{
+  "mode": "custom",
+  "instructions": {
+    "complete_instructions": "Refactor error handling to use middleware..."
+  }
+}
 ```
 
-### Pattern Selection Checklist
+**Execution**: Parse `complete_instructions` and execute step by step.
 
-Before deciding approach, verify:
-- [ ] Read CONVENTIONS.md completely
-- [ ] Check Decision Matrix for your scenario
-- [ ] Review pattern Pros/Cons
-- [ ] Look at examples in codebase
-- [ ] Confirm selected pattern fits your case
+---
+
+## Execution Flow
+
+### Step 1: Parse Input
+
+```python
+# Extract all sections
+wave = input["wave"]
+service = input["service"]
+base_context = input.get("base_context", {})
+mode = input["mode"]
+instructions = input.get("instructions", {})
+output = input["output"]
+```
+
+### Step 2: Execute Mode Base Behavior
+
+```python
+if mode == "plan_refinement":
+    execute_plan_refinement_base(base_context, instructions)
+elif mode == "adjustment":
+    execute_adjustment_base(base_context, instructions)
+# ... etc
+```
+
+### Step 3: Apply Specific Instructions
+
+```python
+# Adjust behavior based on specific instructions
+if "focus_on" in instructions:
+    focus_areas = instructions["focus_on"]
+if "constraints" in instructions:
+    apply_constraints(instructions["constraints"])
+```
+
+### Step 4: Write Output
+
+```python
+# Always write artifacts
+write_file(output["plan"], plan_content)
+write_file(output["summary"], summary_json)
+```
+
+---
+
+## Common Tasks by Mode
+
+### Adding Pagination (Adjustment Mode)
+
+**Input**:
+```json
+{
+  "mode": "adjustment",
+  "instructions": {
+    "goal": "Add pagination to GET /analytics/jobs",
+    "pagination_requirements": {
+      "page_param": "page",
+      "size_param": "page_size",
+      "default_size": 20,
+      "max_size": 100
+    },
+    "files_to_modify": [
+      "src/api/analytics.py",
+      "src/services/analytics.py"
+    ]
+  }
+}
+```
+
+**Your Steps**:
+1. Read existing PLAN.md
+2. Read CONVENTIONS.md for pagination patterns
+3. Update PLAN.md with pagination details
+4. Note: Implementation happens in Wave 3
+
+### Fixing Test Mock (Quick Fix Mode)
+
+**Input**:
+```json
+{
+  "mode": "quick_fix",
+  "instructions": {
+    "problem": "Mock missing branch_name field",
+    "fix": "Add org.branch_name to mock",
+    "file": "tests/test_validation.py"
+  }
+}
+```
+
+**Your Steps**:
+1. Read the test file
+2. Find the mock
+3. Add missing field
+4. Run the test
+5. Append fix to CHANGES.md
+
+### Custom Refactor (Custom Mode)
+
+**Input**:
+```json
+{
+  "mode": "custom",
+  "instructions": {
+    "complete_instructions": """
+1. Read src/api/analytics.py
+2. Extract error handling into middleware
+3. Update all handlers to remove try-catch
+4. Ensure tests still pass
+"""
+  }
+}
+```
+
+**Your Steps**:
+1. Parse the complete_instructions
+2. Execute step by step
+3. Report progress
 
 ---
 
 ## Error Handling
 
-**If input files don't exist**:
-- Wave 2: Stop, report "failed", list missing files
-- Wave 3: Stop, report "failed" (no implementar sin plan)
-- Wave 4: Stop, report "failed"
+**If mode is unknown**:
+```json
+{
+  "status": "failed",
+  "error": f"Unknown mode: {mode}",
+  "supported_modes": ["plan_refinement", "adjustment", "implementation", "verification", "quick_fix", "context_query", "custom"]
+}
+```
 
-**If you need clarification**:
-1. Set status "needs_clarification"
-2. List specific questions
-3. Write partial artifacts
+**If required instruction missing**:
+```json
+{
+  "status": "failed",
+  "error": "Missing required instruction: 'goal' for adjustment mode"
+}
+```
 
-**If tests fail**:
-- Stop execution
-- Report which test failed
-- Include test output in summary
-- Do NOT continue to next change
+**If base_context file missing**:
+- Try to proceed with available info
+- Note missing file in summary
+- Report warning
 
 ---
 
 ## Output Requirements
 
-Always write BOTH:
-1. **Artefact markdown** — comprehensive, detailed
-2. **Summary JSON** — minimal, for orchestrator tracking
+Always write:
+1. **Main artifact** (PLAN.md, CHANGES.md, TEST-RESULTS.md, etc.)
+2. **Summary JSON** for orchestrator tracking
 
-Never return analysis in response text.
+Summary JSON must include:
+```json
+{
+  "wave": 2,
+  "mode": "plan_refinement",
+  "status": "completed|failed|needs_context",
+  "artifacts_written": ["..."],
+  "notes": "..."
+}
+```
 
 ---
 
 ## Anti-Patterns
 
-❌ **Don't**: Ignore `read_instructions` section
-❌ **Don't**: Assume you know what files to read
-❌ **Don't**: Skip CONVENTIONS.md reading
+❌ **Don't**: Ignore the `mode` — it's your primary guide
+❌ **Don't**: Skip reading base_context files
 ❌ **Don't**: Return analysis instead of writing files
-❌ **Don't**: Commitear en Wave 3
+❌ **Don't**: Assume you know what to do without reading instructions
 
-✅ **Do**: Follow reading order in prompt
-✅ **Do**: Read CONVENTIONS.md before deciding approach
+✅ **Do**: Check `mode` first to determine base behavior
+✅ **Do**: Read all base_context files before starting
+✅ **Do**: Apply specific_instructions on top of base behavior
 ✅ **Do**: Write complete artifacts
-✅ **Do**: Report failures explicitly
+✅ **Do**: Report failures explicitly with details

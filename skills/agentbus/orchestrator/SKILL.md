@@ -1,7 +1,7 @@
 ---
 name: agentbus orchestrator
 description: Cross-service planning orchestrator for AgentBus. Coordinates multi-wave planning across microservices using evidence-based workflow. Updated for Deep Mapping (5-document AGENTS/ folder).
-version: 2.1.0
+version: 2.2.0
 triggers: [agentbus plan, cross-service feature, multi-service orchestration]
 tools: [Read, Write, Bash, Glob, Grep, Task]
 tags: [agentbus, orchestrator, wave-based, coordination, microservices]
@@ -13,12 +13,13 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 **Skill Padre**: `agentbus` — Este es un subskill especializado invocado para coordinar waves.
 
-## Core Principle: Explicit Instructions
+## Core Principle: Explicit but Flexible Instructions
 
-**Subagents CANNOT see your context.** You must explicitly tell them:
-1. **What files to read** (absolute paths)
-2. **What to do with them** (analyze, extract, compare)
-3. **What files to write** (absolute paths)
+**Subagents CANNOT see your context.** You must tell them what to do, but keep it flexible enough for different scenarios:
+
+1. **Base Context** — Always provided (AGENTS/ docs, PLAN.md, etc.)
+2. **Specific Instructions** — Varies by scenario (refinement, fix, adjustment, etc.)
+3. **User Context** — Optional additional context from user
 
 ---
 
@@ -40,51 +41,51 @@ Wave 5: Wrap-up (optional) →  Git commits + final deployment prep
 
 **CRITICAL**: Subagents receive NO context from you. The `prompt` parameter is their ONLY source of information.
 
-### Required Prompt Structure
+### Flexible Prompt Structure
 
 ```python
 Task(
     subagent_name="agentbus [subskill]",
     description="Wave X: [description]",
     prompt=json.dumps({
-        # 1. MISSION - What to do
-        "mission": "Create detailed implementation plan",
+        # 1. BASE CONTEXT (always provided)
         "wave": 2,
-        "mode": "plan_refinement",  # If applicable
-        
-        # 2. CONTEXT - What to read (ABSOLUTE PATHS)
-        "read_files": {
-            "agents_dir": "/workspace/service/.agentbus/AGENTS",
-            "required_documents": [
-                "STACK.md",
-                "ARCHITECTURE.md", 
-                "STRUCTURE.md",
-                "CONVENTIONS.md",  # MOST IMPORTANT
-                "CONCERNS.md"
-            ],
-            "seed_plan": "/workspace/agentbus-orchestrator/001-feature/SEED-PLAN.md",
-            "design_decisions": "/workspace/agentbus-orchestrator/001-feature/service-outputs/service-dac.json"
-        },
-        "read_instructions": {
-            "order": ["CONVENTIONS.md", "ARCHITECTURE.md", "STRUCTURE.md", "STACK.md", "CONCERNS.md"],
-            "focus": "CONVENTIONS.md contains decision patterns - read this first",
-            "fallback": "If any file missing, proceed with available info and note in report"
-        },
-        
-        # 3. OUTPUT - What to write (ABSOLUTE PATHS)
-        "output_files": {
-            "refined_plan": "/workspace/service/.agentbus-plans/001-feature/PLAN.md",
-            "summary_json": "/workspace/agentbus-orchestrator/001-feature/service-outputs/service.json"
-        },
-        "output_requirements": {
-            "plan_must_include": ["approach_selected", "files_to_modify", "testing_strategy"],
-            "summary_must_include": ["status", "artifacts_written", "blockers"]
-        },
-        
-        # 4. SERVICE CONTEXT
         "service": {
             "name": "service-name",
             "path": "/workspace/service"
+        },
+        "base_context": {
+            "agents_dir": "/workspace/service/.agentbus/AGENTS",
+            "plan": "/workspace/service/.agentbus-plans/001-feature/PLAN.md",
+            "changes": "/workspace/service/.agentbus-plans/001-feature/CHANGES.md"
+        },
+        
+        # 2. MODE / SCENARIO (determines base instructions)
+        "mode": "plan_refinement",  # or "adjustment", "quick_fix", "context_query", etc.
+        
+        # 3. SPECIFIC INSTRUCTIONS (varies by scenario)
+        "instructions": {
+            "goal": "Add error handling to the analytics endpoint",
+            "scope": "limited",  # "full" or "limited"
+            "constraints": [
+                "Don't change the API contract",
+                "Use existing error pattern from CONVENTIONS.md",
+                "Add tests for new error cases"
+            ],
+            "focus_areas": ["src/api/analytics.py", "src/services/analytics.py"]
+        },
+        
+        # 4. ADDITIONAL CONTEXT (optional)
+        "additional_context": {
+            "user_request": "The endpoint is failing silently, we need proper error responses",
+            "related_changes": "See CHANGES.md lines 45-60 for similar pattern",
+            "priority": "high"
+        },
+        
+        # 5. OUTPUT (where to write results)
+        "output": {
+            "plan": "/workspace/service/.agentbus-plans/001-feature/PLAN.md",
+            "summary": "/workspace/orchestrator/001-feature/service-outputs/service.json"
         }
     }),
     readonly=False
@@ -93,304 +94,279 @@ Task(
 
 ---
 
-## Wave-by-Wave Subagent Instructions
+## Modes / Scenarios
+
+Each mode has **default base instructions** that the subagent knows. You just specify the mode and any **specific additions**.
+
+### Mode: `plan_refinement` (Wave 2)
+
+**Default base instructions** (subagent knows this):
+- Read CONVENTIONS.md first (decision patterns)
+- Read ARCHITECTURE.md (understand structure)
+- Read SEED-PLAN.md (what to build)
+- Cross-reference approach
+- Write detailed PLAN.md
+
+**Your specific additions**:
+```json
+{
+  "mode": "plan_refinement",
+  "instructions": {
+    "focus_on": ["api_endpoints", "database_changes"],
+    "skip": ["frontend_changes"]
+  }
+}
+```
+
+### Mode: `adjustment` (Wave 2b/4b)
+
+For minor modifications to existing plans.
+
+**Your specific additions**:
+```json
+{
+  "mode": "adjustment",
+  "instructions": {
+    "goal": "Add pagination to the list endpoint",
+    "base_plan": "Existing PLAN.md is mostly correct, just add pagination",
+    "constraints": [
+      "Keep existing filters",
+      "Default page_size: 20",
+      "Follow existing pattern in src/api/tools.py"
+    ]
+  }
+}
+```
+
+### Mode: `quick_fix` (Wave 4b)
+
+For small fixes after verification.
+
+**Your specific additions**:
+```json
+{
+  "mode": "quick_fix",
+  "instructions": {
+    "problem": "Test failing due to missing mock field",
+    "fix": "Add 'branch_name' to mock in test_validation_email",
+    "test_after_fix": True
+  }
+}
+```
+
+### Mode: `context_query` (Wave 2b)
+
+For gathering info from other services.
+
+**Your specific additions**:
+```json
+{
+  "mode": "context_query",
+  "instructions": {
+    "questions": [
+      "What fields does GET /users/{id} return?",
+      "Is branch_name nested in org or flat?"
+    ]
+  }
+}
+```
+
+### Mode: `custom`
+
+For any scenario not covered. You provide **complete instructions**.
+
+```json
+{
+  "mode": "custom",
+  "instructions": {
+    "complete_instructions": "Read PLAN.md and CHANGES.md. The user wants to refactor the error handling to use a middleware approach instead of try-catch in each handler. Update both the implementation and the tests. Don't modify the API responses."
+  }
+}
+```
+
+---
+
+## Wave-by-Wave Examples
 
 ### Wave 1: Service Mapping
-
-**Subagent**: `agentbus map-codebase`
 
 ```python
 Task(
     subagent_name="agentbus map-codebase",
     description=f"Wave 1: Deep map {service}",
     prompt=json.dumps({
-        "mission": "Explore codebase and generate 5 AGENTS/ documents",
         "wave": 1,
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "deep_mapping",
+        "instructions": {
+            "goal": "Generate 5 AGENTS/ documents",
+            "focus": ["conventions", "patterns", "decision_matrix"]
         },
-        "discovery_focus": {
-            "stack": ["language", "framework", "database", "dependencies"],
-            "architecture": ["pattern", "layers", "data_flow"],
-            "structure": ["directory_layout", "naming_conventions"],
-            "conventions": ["patterns_available", "when_to_use_each", "decision_matrix"],
-            "concerns": ["tech_debt", "known_issues", "limitations"]
-        },
-        "output_files": {
+        "output": {
             "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
-            "documents_to_create": [
-                "STACK.md",
-                "ARCHITECTURE.md",
-                "STRUCTURE.md",
-                "CONVENTIONS.md",
-                "CONCERNS.md"
-            ],
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}.json"
         }
     }),
     readonly=False
 )
 ```
 
-**Post-Spawn**: Wait for completion, read summary JSON, update status.json
-
----
-
-### Wave 1.5: Design Alignment Checkpoint
-
-**No subagent** — Orchestrator does this directly:
-
-```python
-# 1. Read SEED-PLAN.md
-seed_plan = read_file(f"{orchestrator_path}/SEED-PLAN.md")
-
-# 2. Read CONVENTIONS.md from each service
-for service in services:
-    conventions = read_file(f"/workspace/{service}/.agentbus/AGENTS/CONVENTIONS.md")
-    # Apply heuristics
-    # Detect conflicts
-    # Present to user
-```
-
----
-
-### Wave 2: Plan Refinement
-
-**Subagent**: `agentbus service agent`
+### Wave 2: Plan Refinement (Standard)
 
 ```python
 Task(
     subagent_name="agentbus service agent",
     description=f"Wave 2: Refine plan for {service}",
     prompt=json.dumps({
-        "mission": "Create detailed implementation plan based on AGENTS/ and SEED-PLAN",
         "wave": 2,
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
-        },
-        "read_files": {
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "plan_refinement",
+        "base_context": {
             "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
-            "required_documents": {
-                "CONVENTIONS.md": "MOST IMPORTANT - contains decision patterns",
-                "ARCHITECTURE.md": "Understand patterns and data flow",
-                "STRUCTURE.md": "Know where to place files",
-                "STACK.md": "Technology constraints",
-                "CONCERNS.md": "Things to avoid"
+            "seed_plan": f"/workspace/orchestrator/{plan_id}/SEED-PLAN.md"
+        },
+        "instructions": {
+            "validate_against_conventions": True
+        },
+        "output": {
+            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}.json"
+        }
+    }),
+    readonly=False
+)
+```
+
+### Wave 2: Plan Adjustment (Minor Change)
+
+Example: User wants to add pagination to an endpoint already planned.
+
+```python
+Task(
+    subagent_name="agentbus service agent",
+    description=f"Wave 2b: Adjust plan for {service}",
+    prompt=json.dumps({
+        "wave": 2,
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "adjustment",
+        "base_context": {
+            "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
+            "existing_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md"
+        },
+        "instructions": {
+            "goal": "Add pagination to GET /analytics/jobs endpoint",
+            "base_plan": "Existing PLAN.md is correct, just add pagination support",
+            "pagination_requirements": {
+                "page_param": "page",
+                "size_param": "page_size",
+                "default_size": 20,
+                "max_size": 100
             },
-            "seed_plan": f"/workspace/agentbus-orchestrator/{plan_id}/SEED-PLAN.md",
-            "design_decisions": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}-dac.json"
-        },
-        "read_instructions": {
-            "step_1": "Read CONVENTIONS.md first - identify available patterns",
-            "step_2": "Read ARCHITECTURE.md - understand how components interact",
-            "step_3": "Read SEED-PLAN.md - understand what needs to be built",
-            "step_4": "Cross-reference: Does SEED-PLAN approach match CONVENTIONS patterns?",
-            "step_5": "Read STRUCTURE.md - determine exact file locations"
-        },
-        "analysis_requirements": {
-            "must_check_conventions": True,
-            "must_check_architecture": True,
-            "must_provide_file_paths": True,
-            "must_select_approach_from_conventions": True
-        },
-        "output_files": {
-            "refined_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-        },
-        "output_requirements": {
-            "plan_must_include": [
-                "Approach selected (from CONVENTIONS.md)",
-                "Files to modify/create with absolute paths",
-                "Database changes (if any)",
-                "API changes (if any)",
-                "Testing strategy",
-                "Dependencies on other services"
-            ],
-            "if_needs_context": {
-                "set_status": "needs_context",
-                "provide_queries": "List of specific questions for other services"
-            }
-        }
-    }),
-    readonly=False
-)
-```
-
----
-
-### Wave 3: Implementation
-
-**Subagent**: `agentbus service agent`
-
-```python
-Task(
-    subagent_name="agentbus service agent",
-    description=f"Wave 3: Implement changes for {service}",
-    prompt=json.dumps({
-        "mission": "Execute PLAN.md - modify code, run tests, NO commits",
-        "wave": 3,
-        "pre_flight_checks": [
-            "Verify on feature branch (git branch)",
-            "Verify working directory clean"
-        ],
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
-        },
-        "read_files": {
-            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-            "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
-            "key_documents": ["CONVENTIONS.md", "STRUCTURE.md"]
-        },
-        "read_instructions": {
-            "step_1": "Read PLAN.md completely - understand all changes",
-            "step_2": "Read CONVENTIONS.md - verify approach is still appropriate",
-            "step_3": "Read STRUCTURE.md - confirm file locations",
-            "step_4": "For each change in PLAN: implement, test, proceed"
-        },
-        "execution_rules": {
-            "no_commits": True,
-            "test_after_each_change": True,
-            "stop_on_test_failure": True,
-            "preserve_existing_code": True
-        },
-        "output_files": {
-            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-        },
-        "output_requirements": {
-            "changes_log_must_include": [
-                "List of all files modified",
-                "What changed in each file",
-                "Test results for each change",
-                "Rollback commands",
-                "Suggested commit messages (for Wave 5)"
+            "files_to_modify": [
+                "src/api/analytics.py",
+                "src/services/analytics.py",
+                "tests/test_analytics.py"
             ]
+        },
+        "output": {
+            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",  # Update in place
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-adjustment.json"
         }
     }),
     readonly=False
 )
 ```
 
----
-
-### Wave 4: Verification
-
-**Subagent**: `agentbus service agent`
+### Wave 3: Implementation (Standard)
 
 ```python
 Task(
     subagent_name="agentbus service agent",
-    description=f"Wave 4: Verify implementation for {service}",
+    description=f"Wave 3: Implement for {service}",
     prompt=json.dumps({
-        "mission": "Run full test suite and verify production readiness",
-        "wave": 4,
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
-        },
-        "read_files": {
-            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md"
-        },
-        "read_instructions": {
-            "step_1": "Read CHANGES.md - understand what was implemented",
-            "step_2": "Read PLAN.md - verify all items completed",
-            "step_3": "Run full test suite",
-            "step_4": "Check cross-service compatibility"
-        },
-        "verification_checklist": [
-            "All unit tests pass",
-            "All integration tests pass",
-            "Code follows project conventions",
-            "No breaking changes without migration path",
-            "Documentation updated (if needed)"
-        ],
-        "output_files": {
-            "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
-        }
-    }),
-    readonly=False
-)
-```
-
----
-
-### Wave 4b: Adjustments
-
-**Subagent**: `agentbus service agent` (mode: explain or quick_fix)
-
-```python
-Task(
-    subagent_name="agentbus service agent",
-    description=f"Wave 4b: Quick fix for {service}",
-    prompt=json.dumps({
-        "mission": "Apply quick fix to address test failure",
-        "wave": "4b",
-        "mode": "quick_fix",
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
-        },
-        "read_files": {
+        "wave": 3,
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "implementation",
+        "base_context": {
             "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
-            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-            "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
             "agents_dir": f"/workspace/{service}/.agentbus/AGENTS"
         },
-        "fix_request": "[User's specific fix request]",
-        "constraints": {
-            "no_architectural_changes": True,
-            "no_new_endpoints": True,
-            "test_after_fix": True
+        "instructions": {
+            "no_commits": True,
+            "test_each_change": True
         },
-        "output_files": {
-            "changes_log_append": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}-4b.json"
+        "output": {
+            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}.json"
         }
     }),
     readonly=False
 )
 ```
 
----
-
-### Wave 5: Wrap-up
-
-**Subagent**: `agentbus service agent`
+### Wave 4b: Quick Fix
 
 ```python
 Task(
     subagent_name="agentbus service agent",
-    description=f"Wave 5: Create commits for {service}",
+    description=f"Wave 4b: Fix for {service}",
     prompt=json.dumps({
-        "mission": "Create git commits for all verified changes",
-        "wave": 5,
-        "pre_flight_requirements": [
-            "User explicitly confirmed commits",
-            "On feature branch (not main/master)",
-            "All tests pass",
-            "Working directory has Wave 3 changes"
-        ],
-        "service": {
-            "name": service,
-            "path": f"/workspace/{service}"
-        },
-        "read_files": {
+        "wave": "4b",
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "quick_fix",
+        "base_context": {
+            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
             "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
             "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md"
         },
-        "commit_rules": {
-            "atomic_commits": True,
-            "conventional_commits": True,
-            "reference_plan_id": True
+        "instructions": {
+            "problem": "test_validation_email fails - missing branch_name in mock",
+            "fix": "Add org.branch_name to mock response",
+            "file": "tests/test_validation.py"
         },
-        "output_files": {
-            "commit_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/COMMITS.md",
-            "summary_json": f"/workspace/agentbus-orchestrator/{plan_id}/service-outputs/{service}.json"
+        "output": {
+            "changes_log_append": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-4b.json"
+        }
+    }),
+    readonly=False
+)
+```
+
+### Custom Scenario: Refactor Error Handling
+
+```python
+Task(
+    subagent_name="agentbus service agent",
+    description=f"Custom: Refactor error handling for {service}",
+    prompt=json.dumps({
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "custom",
+        "base_context": {
+            "agents_dir": f"/workspace/{service}/.agentbus/AGENTS",
+            "existing_plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md"
+        },
+        "instructions": {
+            "complete_instructions": """
+Refactor error handling in the analytics endpoints:
+
+Current: Each handler has try-catch blocks
+Target: Use centralized error middleware
+
+Steps:
+1. Read CONVENTIONS.md for error handling patterns
+2. Look at src/middleware/error_handler.py (if exists) or create it
+3. Update src/api/analytics.py to remove try-catch, let errors bubble up
+4. Update tests to expect middleware handling
+5. Ensure API responses remain the same (don't break contract)
+
+Reference: See CHANGES.md lines 45-60 for current implementation.
+"""
+        },
+        "output": {
+            "changes_log_append": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-refactor.json"
         }
     }),
     readonly=False
@@ -407,19 +383,18 @@ Task(
   "services": ["svc1", "svc2"],
   "current_wave": 2,
   "waves": {
-    "wave_1_mapping": {
+    "wave_1_mapping": {"status": "completed"},
+    "wave_2_refinement": {
       "status": "completed",
-      "artifacts": {
-        "svc1": {
-          "agents_dir": "/workspace/svc1/.agentbus/AGENTS",
-          "documents": ["STACK.md", "ARCHITECTURE.md", "STRUCTURE.md", "CONVENTIONS.md", "CONCERNS.md"]
+      "adjustments": [
+        {
+          "timestamp": "2024-01-15T10:30:00Z",
+          "description": "Added pagination to analytics endpoint",
+          "mode": "adjustment"
         }
-      }
+      ]
     },
-    "wave_2_refinement": {"status": "in_progress"},
-    "wave_3_implementation": {"status": "pending"},
-    "wave_4_verification": {"status": "pending"},
-    "wave_5_wrapup": {"status": "pending", "optional": true}
+    "wave_3_implementation": {"status": "pending"}
   }
 }
 ```
@@ -428,13 +403,12 @@ Task(
 
 ## Anti-Patterns
 
-❌ **Don't**: Assume subagents know what to read
-❌ **Don't**: Pass only directory paths without file lists
-❌ **Don't**: Omit `read_instructions` section
-❌ **Don't**: Use relative paths in prompts (always absolute)
+❌ **Don't**: Use `mode: "custom"` when a standard mode exists
+❌ **Don't**: Omit `base_context` — subagents need to know where files are
+❌ **Don't**: Write vague instructions like "fix it"
+❌ **Don't**: Assume subagent remembers previous waves
 
-✅ **Do**: Explicitly list every file subagent must read
-✅ **Do**: Provide step-by-step reading order
-✅ **Do**: Explain WHY each file matters
-✅ **Do**: Include fallback instructions
-✅ **Do**: Verify subagent received all paths before spawning
+✅ **Do**: Use standard modes when possible
+✅ **Do**: Provide specific, actionable instructions
+✅ **Do**: Include file paths in base_context
+✅ **Do**: Keep custom instructions concise but complete
