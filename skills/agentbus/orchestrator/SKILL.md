@@ -23,17 +23,32 @@ Coordinates cross-service planning across microservices. Lives at the workspace 
 
 ---
 
-## Wave Flow (Updated for Deep Mapping)
+## Wave Flow (Updated for Deep Mapping + Two-Batch Consistency)
 
 ```
-Wave 1: Service Mapping    →  AGENTS/ (5 docs via map-codebase)
-Wave 1.5: Design Alignment →  Validated approach decisions
-Wave 2: Plan Refinement    →  PLAN.md
-Wave 2.5: Contract Check   →  Consistency validation (optional)
-Wave 3: Implementation     →  Code modified (no commits yet)
-Wave 4: Verification       →  TEST-RESULTS.md
-Wave 5: Wrap-up (optional) →  Git commits + final deployment prep
+Wave 1: Service Mapping         →  AGENTS/ (5 docs via map-codebase)
+Wave 1.5: Design Alignment      →  Validated approach decisions
+Wave 2: Plan Refinement         →  PLAN.md
+Wave 2.5: Plan Alignment        →  Batch 1: High-level consistency (PLAN.md)
+Wave 3: Implementation          →  Code modified (no commits)
+Wave 3.5: Contract Validation   →  Batch 2: Deep consistency (code) - Optional
+Wave 4: Verification            →  TEST-RESULTS.md
+Wave 5: Wrap-up (optional)      →  Git commits + final deployment prep
 ```
+
+### Two-Batch Consistency Check
+
+**Batch 1 (Wave 2.5): Plan Alignment** — Always run
+- **Input**: PLAN.md de cada servicio
+- **Detecta**: Diseño desalineado (paths, field names, métodos)
+- **Costo de fix**: Bajo (editar PLAN.md)
+- **Cuándo**: Pre-implementación
+
+**Batch 2 (Wave 3.5): Contract Validation** — Optional
+- **Input**: CHANGES.md + código implementado
+- **Detecta**: Drift de implementación, type mismatches
+- **Costo de fix**: Medio (modificar código)
+- **Cuándo**: Post-implementación, para features complejos
 
 ---
 
@@ -303,6 +318,133 @@ Task(
     readonly=False
 )
 ```
+
+
+### Wave 2.5: Plan Alignment (Batch 1)
+
+**Purpose**: Validate cross-service consistency at design level before implementation.
+
+**No subagent** — Orchestrator does this directly by reading PLAN.md files:
+
+```python
+# 1. Read PLAN.md from each service
+contracts = {}
+for service in services:
+    plan = read_file(f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md")
+    contracts[service] = parse_contracts_from_plan(plan)
+
+# 2. Cross-reference
+issues = detect_cross_service_issues(contracts)
+
+# 3. Generate report
+write_file(
+    f"/workspace/orchestrator/{plan_id}/PLAN-ALIGNMENT-REPORT.md",
+    generate_alignment_report(issues)
+)
+
+# 4. If blockers found, present to user
+if issues.blockers:
+    ask_user_for_decisions(issues)
+    apply_fixes_to_plans()  # Edit PLAN.md files
+    re_validate()
+```
+
+**Issues detected**:
+- 🔴 Blocker: Endpoint path mismatch
+- 🔴 Blocker: Field name mismatch (caller vs callee)  
+- 🔴 Blocker: HTTP method mismatch
+- 🟡 Warning: Schema structure differences
+- 🟢 Info: Extra fields
+
+**UI Example**:
+```
+═══════════════════════════════════════════════════════════════
+  WAVE 2.5: PLAN ALIGNMENT
+═══════════════════════════════════════════════════════════════
+
+Servicios analizados: journey-api, cronjob-api
+
+⚠️  2 blockers detectados:
+
+1. Endpoint Path Mismatch
+   Journey planea llamar: POST /webhooks/analytics-complete
+   Cronjob expone:        POST /analytics/internal/callback
+
+2. Field Name Mismatch
+   Journey enviará:  completed_at, error
+   Cronjob espera:   finished_at, error_message
+
+Opciones:
+  [v] Ver reporte completo
+  [f] Auto-fix — Alinear a convención de cronjob
+  [m] Manual — Especificar tú los nombres correctos
+  [s] Skip — Proceder a Wave 3 (riesgoso)
+
+Tu elección: _
+```
+
+---
+
+
+### Wave 3.5: Contract Validation (Batch 2) — Optional
+
+**Purpose**: Deep validation of implementation against contracts.
+
+**When to use**: Complex features with >2 services or critical integrations.
+
+**Input**: CHANGES.md + source code
+
+**Subagent**: Specialized contract validator or orchestrator analysis:
+
+```python
+# Option A: Orchestrator does analysis directly
+for service in services:
+    changes = read_file(f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md")
+    actual_contracts = analyze_source_code(service, changes)
+    
+# Compare with planned contracts
+issues = compare_planned_vs_actual(planned_contracts, actual_contracts)
+
+# Generate report
+write_file(
+    f"/workspace/orchestrator/{plan_id}/CONTRACT-VALIDATION-REPORT.md",
+    generate_validation_report(issues)
+)
+```
+
+**Issues detected**:
+- 🔴 Critical: Implementation drift (plan said POST, code does GET)
+- 🔴 Critical: Type mismatch (plan said string, code uses int)
+- 🟡 Warning: Hardcoded URL (should be config)
+- 🟡 Warning: Timeout mismatch (caller 5s, callee 8s)
+
+**UI Example**:
+```
+═══════════════════════════════════════════════════════════════
+  WAVE 3.5: CONTRACT VALIDATION (Optional)
+═══════════════════════════════════════════════════════════════
+
+Análisis de implementación real...
+
+⚠️  1 critical issue detectado:
+
+CRIT-001: Implementation Drift
+  Location: journey-api/src/api/analytics.py:45
+  Plan specified: POST /analytics/internal/callback
+  Implementation: GET /analytics/internal/callback
+  Impact: 405 Method Not Allowed from cronjob
+
+Opciones:
+  [v] Ver reporte completo con code diffs
+  [f] Auto-fix — Cambiar GET a POST
+  [m] Manual — Revisar y fixear tú
+  [i] Ignorar — Proceder a Wave 4 (riesgoso)
+  [s] Skip Wave 3.5 — No ejecutar para este feature
+
+Tu elección: _
+```
+
+---
 
 ### Wave 4b: Quick Fix
 
