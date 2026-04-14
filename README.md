@@ -9,20 +9,22 @@ This project removes the "developer as messenger" problem when understanding and
 Instead of accumulating state in memory, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1:  Service Mapping      →  AGENTS.md (understand service)
-Wave 2a: Plan Refinement      →  PLAN.md (plan the change)
-Wave 2b: Context Queries      →  Answers from adjacent services
-Wave 3:  Implementation       →  Code modified (no commits yet)
-Wave 4:  Verification         →  TEST-RESULTS.md (verify it works)
-Wave 4b: Adjustments (opt)   →  Minor fixes + clarifications
-Wave 5:  Wrap-up (opt)       →  Git commits + deployment prep
+Wave 1:   Service Mapping         →  AGENTS/ (5 docs per service)
+Wave 1.5: Design Alignment        →  Validated approach decisions  
+Wave 2:   Plan Refinement         →  PLAN.md (plan the change)
+Wave 2.5: Plan Alignment          →  Cross-service consistency check
+Wave 3:   Implementation          →  Code modified (no commits yet)
+Wave 3.5: Contract Validation     →  Deep implementation check (optional)
+Wave 4:   Verification            →  TEST-RESULTS.md (verify it works)
+Wave 4b:  Adjustments (opt)       →  Minor fixes + clarifications
+Wave 5:   Wrap-up (opt)           →  Git commits + deployment prep
 ```
 
 Benefits:
 - **Context efficiency**: Orchestrator reads only what it needs
 - **Auditability**: Complete history in version-controlled files
 - **Resumability**: Failed waves can be retried independently
-- **Reusability**: AGENTS.md serves as ongoing service documentation
+- **Reusability**: AGENTS/ serves as ongoing service documentation
 
 ## Repository Layout
 
@@ -56,9 +58,10 @@ agentbus-skills/
 
 | Wave | Purpose | Key Output |
 |------|---------|------------|
-| 1 | Map services | `AGENTS.md` |
-| 2a | Create plans | `PLAN.md` |
-| 2b | Query adjacent services | Context answers |
+| 1 | Map services | `AGENTS/` (5 docs) |
+| 1.5 | Validate approaches | Design decisions |
+| 2 | Create plans | `PLAN.md` |
+| 2.5 | Check consistency | Alignment report |
 | 3 | Implement changes | Modified code + `CHANGES.md` |
 | 4 | Verify with tests | `TEST-RESULTS.md` |
 | 4b | Adjust/fix minor issues | Updated code |
@@ -81,8 +84,13 @@ workspace/
 │           └── {service}.json
 │
 ├── payments-service/             # Service repo
-│   ├── AGENTS.md                 # Written by Wave 1
-│   └── .agentbus-plans/
+│   └── .agentbus/
+│       └── AGENTS/               # ← Wave 1: 5 service documents
+│           ├── STACK.md
+│           ├── ARCHITECTURE.md
+│           ├── STRUCTURE.md
+│           ├── CONVENTIONS.md
+│           └── CONCERNS.md
 │       └── 001-feature-slug/     # Plan folder
 │           ├── PLAN.md           # Written by Wave 2
 │           ├── CHANGES.md        # Written by Wave 3
@@ -185,7 +193,7 @@ Run orchestrator again to start mapping:
 ```
 
 Each subagent writes:
-- `{service}/AGENTS.md` (creates or updates)
+- `{service}/.agentbus/AGENTS/*.md` (5 documents, creates or updates)
 - Summary JSON to orchestrator workspace
 
 ### Phase 4: Wave 2 — Plan Refinement
@@ -195,7 +203,7 @@ Each subagent writes:
 ```
 
 Each subagent:
-- Reads `AGENTS.md` from its service
+- Reads `AGENTS/` documents from its service (especially CONVENTIONS.md)
 - Reads `SEED-PLAN.md`
 - Writes refined `PLAN.md` to service repo
 
@@ -276,6 +284,6 @@ If a subagent fails:
 
 - **No helper scripts required** for core orchestration logic
 - Skills use `Task` tool to spawn parallel subagents
-- AGENTS.md persists as living service documentation
+- AGENTS/ persists as living service documentation (5 specialized documents)
 - Plans are kept in repos for visibility/auditability
 - Current version favors simplicity over strong concurrency controls

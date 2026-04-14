@@ -28,20 +28,21 @@ Use AgentBus when you need to:
 Instead of passing data through responses, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1:  Service Mapping      →  AGENTS.md (per service)
-Wave 2a: Plan Refinement      →  PLAN.md (per service)
-Wave 2b: Context Queries      →  Answers from adjacent services
-Wave 3:  Implementation       →  Modified code + CHANGES.md
-Wave 4:  Verification         →  TEST-RESULTS.md
-Wave 4b: Adjustments (opt)   →  Minor fixes + clarifications
-Wave 5:  Wrap-up (opt)       →  Git commits
+Wave 1:   Service Mapping         →  AGENTS/ (5 docs per service)
+Wave 2:   Plan Refinement         →  PLAN.md (per service)
+Wave 2.5: Plan Alignment          →  Cross-service consistency check
+Wave 3:   Implementation          →  Modified code + CHANGES.md
+Wave 3.5: Contract Validation     →  Deep implementation check (optional)
+Wave 4:   Verification            →  TEST-RESULTS.md
+Wave 4b:  Adjustments (opt)       →  Minor fixes + clarifications
+Wave 5:   Wrap-up (opt)           →  Git commits
 ```
 
 **Benefits:**
 - **Context efficiency**: Orchestrator reads only what it needs
 - **Auditability**: Complete history in version-controlled files
 - **Resumability**: Failed waves can be retried independently
-- **Reusability**: AGENTS.md serves as living service documentation
+- **Reusability**: AGENTS/ serves as living service documentation
 
 ## Quick Start Commands
 
@@ -94,22 +95,27 @@ Runs the next wave based on `status.json`.
 
 ### Wave 1: Service Mapping
 
-**Purpose**: Create/update AGENTS.md in each service
+**Purpose**: Create/update AGENTS/ documentation in each service
 
 **What happens:**
 - Orchestrator spawns parallel subagents (one per service)
 - Each subagent maps codebase: stack, architecture, APIs, DB, testing
-- Writes AGENTS.md to service repo
+- Writes 5 documents to `{service}/.agentbus/AGENTS/`:
+  - STACK.md — Technology stack
+  - ARCHITECTURE.md — Patterns and data flow
+  - STRUCTURE.md — Directory layout
+  - CONVENTIONS.md — Implementation patterns (CRITICAL)
+  - CONCERNS.md — Tech debt and risks
 - Writes summary JSON to orchestrator workspace
 
-**Output**: `{service}/AGENTS.md`
+**Output**: `{service}/.agentbus/AGENTS/*.md`
 
 ### Wave 2a: Plan Refinement
 
 **Purpose**: Create detailed implementation plan per service
 
 **What happens:**
-- Subagents read AGENTS.md (their own service)
+- Subagents read AGENTS/ documents (especially CONVENTIONS.md)
 - Read SEED-PLAN.md for context
 - Explore relevant code files
 - Write PLAN.md with specific changes
@@ -207,7 +213,8 @@ workspace/                          # parent folder of all repos
 │           └── {service}.json
 │
 ├── payments-service/               # service repo
-│   ├── AGENTS.md                   # ← Wave 1: service documentation
+│   └── .agentbus/
+│       └── AGENTS/                 # ← Wave 1: 5 service documents
 │   └── .agentbus-plans/
 │       └── 004-feature/            # ← Wave 2-5: plan folder
 │           ├── PLAN.md             # ← Wave 2: refined plan
@@ -253,7 +260,7 @@ This creates the orchestrator workspace with sequential plan ID.
 You: Start mapping
 /agentbus-orchestrator --continue 004-audit-logging
 
-This spawns parallel subagents to create AGENTS.md in each service.
+This spawns parallel subagents to create AGENTS/ documents in each service.
 Wait for completion.
 ```
 
@@ -339,17 +346,21 @@ You: Create commits
 
 ## Key Concepts
 
-### AGENTS.md
+### AGENTS/ (5 Documents)
 
-Living service documentation written by Wave 1. Includes:
-- Technology stack
-- Architecture and directory structure
-- API endpoints
-- Database schema
-- Testing approach
-- Conventions
+Living service documentation written by Wave 1. Located at `{service}/.agentbus/AGENTS/`:
 
-**Reusable**: AGENTS.md is updated on each Wave 1, serving as documentation for future features.
+| Document | Content | Purpose |
+|----------|---------|---------|
+| STACK.md | Technology stack | Know what technologies to use |
+| ARCHITECTURE.md | Patterns, layers, data flow | Structure changes correctly |
+| STRUCTURE.md | Directory layout | Know where to place files |
+| CONVENTIONS.md | Implementation patterns | **Choose the right approach** |
+| CONCERNS.md | Tech debt, risks | Avoid pitfalls |
+
+**Reusable**: AGENTS/ is updated on each Wave 1, serving as documentation for future features.
+
+**CRITICAL**: Always read CONVENTIONS.md first — it contains decision patterns for choosing approaches.
 
 ### PLAN.md
 
@@ -387,8 +398,8 @@ Tracking file that enables resume/retry. Contains:
 ❌ **Don't**: Run all waves in one session (context exhaustion)  
 ✅ **Do**: Run one wave at a time, review, then continue
 
-❌ **Don't**: Modify AGENTS.md manually during planning  
-✅ **Do**: Let Wave 1 subagent update it
+❌ **Don't**: Modify AGENTS/ documents manually during planning  
+✅ **Do**: Let Wave 1 subagent update them
 
 ❌ **Don't**: Skip Wave 4 (verification)  
 ✅ **Do**: Always verify before committing
