@@ -33,13 +33,13 @@ Use this skill:
 ## Invocation
 
 ```
-/agentbus-review --feature-slug "001-feature-slug"
+/agentbus review --feature-slug "001-feature-slug"
 ```
 
 Or for specific services:
 
 ```
-/agentbus-review --feature-slug "001-feature-slug" --services payments notifications
+/agentbus review --feature-slug "001-feature-slug" --services payments notifications
 ```
 
 ## Protocol
@@ -162,7 +162,7 @@ Present concise summary:
 ## Example Workflow
 
 ```
-User: /agentbus-review --feature-slug "001-remove-field"
+User: /agentbus review --feature-slug "001-remove-field"
 
 You:
 1. Read status.json → finds services: [tools-service, bot-service]
@@ -179,7 +179,7 @@ You:
 
 ---
 
-User: /agentbus-review --feature-slug "002-kafka-migration"
+User: /agentbus review --feature-slug "002-kafka-migration"
 
 You:
 1. Read reports

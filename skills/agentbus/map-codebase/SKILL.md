@@ -1,7 +1,7 @@
 ---
 name: agentbus map-codebase
 description: Deep service mapper for AgentBus. Explores a service codebase and generates 5 specialized documents (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, CONCERNS) in .planning/codebase/. Used by the orchestrator during Wave 1.
-version: 2.0.0
+version: 3.0.0
 triggers: [agentbus mapping, service analysis, codebase exploration]
 tools: [Read, Write, Bash, Glob, Grep]
 tags: [agentbus, mapping, service-analysis, documentation]

@@ -1,6 +1,7 @@
 ---
 name: agentbus
 description: Cross-service planning system for multi-service features. Entry point that routes to orchestrator for all execution. Updated for Deep Mapping (.planning/codebase/ folder + Wave 2.5 Plan QA).
+version: 3.0.0
 triggers: [cross-service feature, multi-service planning]
 tools: [Read, Task]
 tags: [agentbus, orchestration, cross-service]

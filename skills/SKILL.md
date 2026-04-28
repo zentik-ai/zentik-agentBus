@@ -1,9 +1,10 @@
 ---
 name: agentbus
 description: Cross-service planning system for LLM coding agents. Orchestrates multi-wave planning across microservices with evidence-based workflow. Updated for .planning/codebase/ output and Plan QA stage.
-version: 2.0.0
+version: 3.0.0
 triggers: [cross-service feature, multi-service planning, service architecture]
 tools: [Read, Write, Bash, Task]
+tags: [agentbus, orchestration, cross-service, planning]
 ---
 
 # AgentBus Skills
@@ -209,9 +210,9 @@ Runs the next wave based on `status.json`.
 
 | Skill | Purpose | Invocation |
 |-------|---------|------------|
-| **agentbus-orchestrator** | Coordinates waves, spawns subagents | `/agentbus-orchestrator "feature"` |
+| **agentbus orchestrator** | Coordinates waves, spawns subagents | `/agentbus orchestrator "feature"` |
 | **agentbus service agent** | Per-service specialist | Via Task tool only |
-| **agentbus-review** | Verifies cross-service consistency | `/agentbus-review --feature-slug "xxx"` |
+| **agentbus review** | Verifies cross-service consistency | `/agentbus review --feature-slug "xxx"` |
 
 ## Workspace Structure
 
@@ -270,7 +271,7 @@ Global registry file: `~/.agentbus/services.json`
 User: "We need to add audit logging to user actions"
 
 You: Initialize planning
-/agentbus-orchestrator "add audit logging to user actions" auth payments notifications
+/agentbus orchestrator "add audit logging to user actions" auth payments notifications
 
 This creates the orchestrator workspace with sequential plan ID.
 ```
@@ -279,7 +280,7 @@ This creates the orchestrator workspace with sequential plan ID.
 
 ```
 You: Start mapping
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 This spawns parallel subagents to create .planning/codebase/ documents in each service.
 Wait for completion.
@@ -289,7 +290,7 @@ Wait for completion.
 
 ```
 You: Refine plans
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 This spawns subagents to write PLAN.md in each service.
 ```
@@ -298,7 +299,7 @@ This spawns subagents to write PLAN.md in each service.
 
 ```
 You: Run QA
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 This spawns specialist agents to identify concerns and gaps.
 The orchestrator will present consolidated questions for your input.
@@ -319,7 +320,7 @@ This queries users-api without adding it to the plan.
 
 ```
 You: Implement changes
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 ⚠️ This modifies source code but does NOT commit.
 ```
@@ -328,7 +329,7 @@ You: Implement changes
 
 ```
 You: Verify implementation
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 This runs tests and creates TEST-RESULTS.md.
 ```
@@ -349,7 +350,7 @@ You: "Fix the mock in test_validation_email"
 
 ```
 You: Create commits
-/agentbus-orchestrator --continue 004-audit-logging
+/agentbus orchestrator --continue 004-audit-logging
 
 ⚠️ Only after confirming everything looks good.
 ```
@@ -360,7 +361,7 @@ You: Create commits
 
 1. Check `status.json` for error details
 2. Fix underlying issue
-3. Re-run: `/agentbus-orchestrator --continue {plan-id}`
+3. Re-run: `/agentbus orchestrator --continue {plan-id}`
 4. Failed subagent re-runs, others unchanged
 
 ### Add Service Mid-Flight
@@ -372,7 +373,7 @@ You: Create commits
 ### Resume After Interruption
 
 1. Read `status.json` to see current wave
-2. Run: `/agentbus-orchestrator --continue {plan-id}`
+2. Run: `/agentbus orchestrator --continue {plan-id}`
 3. Continues from where it left off
 
 ## Key Concepts
@@ -460,4 +461,4 @@ Tracking file that enables resume/retry. Contains:
 
 ## Version
 
-AgentBus Skills v2.0.0 — Evidence-Based Wave Model with Plan QA
+AgentBus Skills v3.0.0 — Evidence-Based Wave Model with Plan QA (Deep Mapping)
