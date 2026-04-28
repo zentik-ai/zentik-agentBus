@@ -1,6 +1,6 @@
 ---
 name: agentbus
-description: Cross-service planning system for multi-service features. Entry point that routes to orchestrator for all execution. Updated for Deep Mapping (AGENTS/ folder + Wave 1.5).
+description: Cross-service planning system for multi-service features. Entry point that routes to orchestrator for all execution. Updated for Deep Mapping (.planning/codebase/ folder + Wave 2.5 Plan QA).
 triggers: [cross-service feature, multi-service planning]
 tools: [Read, Task]
 tags: [agentbus, orchestration, cross-service]
@@ -8,185 +8,211 @@ tags: [agentbus, orchestration, cross-service]
 
 # AgentBus Skills
 
-Sistema de planificación cross-service para features que tocan **2+ microservicios**.
+Cross-service planning system for features that touch **2+ microservices**.
 
 ---
 
-## ¿Cuándo USAR AgentBus?
+## When to Use AgentBus?
 
-✅ **SÍ - Usa AgentBus:**
-- Feature que modifica 2+ servicios (ej: "migrar sync a async entre payments y notifications")
-- Refactor de API que afecta productores y consumidores
-- Cambio de schema que impacta múltiples repos
+✅ **YES — Use AgentBus:**
+- Feature that modifies 2+ services (e.g., "migrate sync to async between payments and notifications")
+- API refactor that affects producers and consumers
+- Schema change that impacts multiple repos
 
-❌ **NO - Usa otras skills:**
-- Cambio en **un solo servicio** → Usa `gsd` o `spec-kit`
-- Solo explorar un codebase → Usa `map-codebase` directo en el repo
+❌ **NO — Use other skills:**
+- Change in **a single service** → Use `gsd` or `spec-kit`
+- Just exploring one codebase → Use `map-codebase` directly on the repo
 
 ---
 
-## Arquitectura
+## Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│  agentbus (skill base)              │  ← Este archivo
-│  └── Solo documenta y routea        │
+│  agentbus (base skill)              │  ← This file
+│  └── Documents and routes only      │
 └─────────────┬───────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│  agentbus orchestrator              │  ← Entry point de ejecución
-│  ├── Spawnea map-codebase (Wave 1)  │
+│  agentbus orchestrator              │  ← Execution entry point
+│  ├── Spawns map-codebase (Wave 1)   │
 │  ├── Design Alignment (Wave 1.5)    │
-│  ├── Spawnea service-agents         │
-│  └── Coordina waves                 │
+│  ├── Plan QA & Concerns (Wave 2.5)  │
+│  ├── Spawns service-agents          │
+│  └── Coordinates waves              │
 └─────────────────────────────────────┘
 ```
 
-| Componente | Rol | Invocación |
-|------------|-----|------------|
-| `agentbus orchestrator` | Coordina waves cross-service | `/agentbus orchestrator ...` |
-| `agentbus map-codebase` | Deep mapping (5 documentos) | Spawned en Wave 1 |
-| `agentbus service agent` | Especialista por servicio | Spawned vía Task (interno) |
-| `agentbus review` | Verifica consistencia cross-service | `/agentbus review ...` |
+| Component | Role | Invocation |
+|-----------|------|------------|
+| `agentbus orchestrator` | Coordinates cross-service waves | `/agentbus orchestrator ...` |
+| `agentbus map-codebase` | Deep mapping (5 documents) | Spawned in Wave 1 |
+| `agentbus service agent` | Specialist per service | Spawned via Task (internal) |
+| `agentbus review` | Verifies cross-service consistency | `/agentbus review ...` |
 
 ---
 
-## Comandos Principales
+## Main Commands
 
-### Descubrimiento (solo lectura)
+### Discovery (read-only)
 ```
-/agentbus orchestrator --ask "cómo funciona el flow de pagos?" payments notifications
+/agentbus orchestrator --ask "how does the payment flow work?" payments notifications
 ```
 
-### Inicializar Plan
+### Initialize Plan
 ```
-/agentbus orchestrator "migrar a eventos async" payments notifications inventory
+/agentbus orchestrator "migrate to async events" payments notifications inventory
 ```
-Crea: `agentbus-orchestrator/001-feature/status.json` + `SEED-PLAN.md`
+Creates: `agentbus-orchestrator/001-feature/status.json` + `SEED-PLAN.md`
 
-### Continuar Waves
+### Continue Waves
 ```
 /agentbus orchestrator --continue 001-feature
 ```
-Ejecuta la siguiente wave basada en `status.json`.
+Executes the next wave based on `status.json`.
 
-### Verificar Consistencia
+### Verify Consistency
 ```
 /agentbus review --feature-slug 001-feature
 ```
 
 ---
 
-## Modelo de Waves (Deep Mapping)
+## Wave Model (Deep Mapping + Plan QA)
 
-| Wave | Nombre | Output | Descripción |
-|------|--------|--------|-------------|
-| 1 | Service Mapping | `AGENTS/` (5 docs) | Deep mapping del servicio |
-| 1.5 | Design Alignment | Decisiones validadas | Checkpoint de approach |
-| 2 | Plan Refinement | `PLAN.md` | Plan detallado por servicio |
-| 2b | Context Queries | Respuestas | Consulta servicios adyacentes |
-| 3 | Implementation | Código + `CHANGES.md` | Modifica código (no commits) |
-| 4 | Verification | `TEST-RESULTS.md` | Corre tests |
-| 4b | Adjustments (opt) | Ajustes | Fixes menores y aclaraciones |
-| 5 | Wrap-up (opt) | `COMMITS.md` | Commits post-verificación |
+| Wave | Name | Output | Description |
+|------|------|--------|-------------|
+| 1 | Service Mapping | `.planning/codebase/` (5 docs) | Deep mapping of the service |
+| 1.5 | Design Alignment | Validated decisions | Approach checkpoint |
+| 2 | Plan Refinement | `PLAN.md` | Detailed per-service plan |
+| 2.5 | Plan QA & Concerns | `QA-REPORT.md` | Surface gaps and doubts for user input |
+| 2.6 | Plan Alignment | Consistency report | Cross-service design check |
+| 2b | Context Queries | Answers | Query adjacent services |
+| 3 | Implementation | Code + `CHANGES.md` | Modify code (no commits) |
+| 3.5 | Contract Validation | Validation report | Deep implementation check (optional) |
+| 4 | Verification | `TEST-RESULTS.md` | Run tests |
+| 4b | Adjustments (opt) | Fixes / explanations | Minor fixes and clarifications |
+| 5 | Wrap-up (opt) | `COMMITS.md` | Post-verification commits |
 
-**Importante:** Corre **una wave a la vez**. Revisa resultados antes de continuar.
+**Important:** Run **one wave at a time**. Review results before continuing.
 
 ### Deep Mapping (Wave 1)
 
-En lugar de un único `AGENTS.md`, Wave 1 genera **5 documentos especializados** en `.agentbus/AGENTS/`:
+Instead of a single `AGENTS.md`, Wave 1 generates **5 specialized documents** in `.planning/codebase/`:
 
-| Documento | Contenido | Uso |
-|-----------|-----------|-----|
-| `STACK.md` | Tech stack, dependencias | Qué tecnologías usar |
-| `ARCHITECTURE.md` | Patrones, capas, flujo | Cómo estructurar cambios |
-| `STRUCTURE.md` | Layout de carpetas | Dónde crear archivos |
-| `CONVENTIONS.md` | Patterns disponibles, cuándo usarlos | **Qué approach usar** |
-| `CONCERNS.md` | Tech debt, riesgos | Qué evitar |
+| Document | Content | Use |
+|----------|---------|-----|
+| `STACK.md` | Tech stack, dependencies | Which technologies to use |
+| `ARCHITECTURE.md` | Patterns, layers, flow | How to structure changes |
+| `STRUCTURE.md` | Directory layout | Where to create files |
+| `CONVENTIONS.md` | Available patterns, when to use them | **Which approach to use** |
+| `CONCERNS.md` | Tech debt, risks | What to avoid |
 
-**CONVENTIONS.md es crítico**: Captura los patterns disponibles en el codebase y ayuda a elegir el mejor approach cuando hay múltiples opciones.
+**CONVENTIONS.md is critical**: Captures the available patterns in the codebase and helps choose the best approach when multiple options exist.
 
 ### Design Alignment Checkpoint (Wave 1.5)
 
-Nuevo checkpoint que valida que los approaches propuestos en `SEED-PLAN` son los mejores disponibles según `CONVENTIONS.md`.
+New checkpoint that validates the approaches proposed in `SEED-PLAN` are the best available according to `CONVENTIONS.md`.
 
-**Heurísticas aplicadas:**
-| Escenario | Preferencia |
-|-----------|-------------|
-| Schema change (ALTER TABLE) | Migración SQL |
-| Datos dinámicos (permisos, configs) | API Endpoint |
-| Datos por ambiente | API/Config |
-| Datos estáticos de referencia | Migración/Seed |
+**Heuristics applied:**
+| Scenario | Preference |
+|----------|------------|
+| Schema change (ALTER TABLE) | SQL Migration |
+| Dynamic data (permissions, configs) | API Endpoint |
+| Per-environment data | API/Config |
+| Static reference data | Migration/Seed |
 
-Si se detecta conflicto, se presenta al usuario para decisión antes de continuar a Wave 2.
+If conflict is detected, present to the user for a decision before continuing to Wave 2.
+
+### Plan QA & Concerns (Wave 2.5) — NEW
+
+Before implementation, the orchestrator asks each specialist agent to identify:
+- **Concerns**: Risks, convention violations, performance issues
+- **Gaps**: Missing error handling, undefined edge cases
+- **Doubts**: Unclear assumptions about data or behavior
+
+The orchestrator consolidates these and **asks the user for input** to refine the plans. This prevents guessing on things that should involve human judgment.
+
+**Flow**:
+1. Orchestrator spawns specialist agents in `plan_qa` mode
+2. Each agent writes `QA-REPORT.md`
+3. Orchestrator consolidates and presents to user
+4. User provides answers
+5. Plans are refined before moving to alignment
 
 ### Context Queries (Wave 2b)
 
-Durante el planning, si un service-agent necesita información de otros servicios (ej: "¿qué devuelve el endpoint de users-api?"), puede solicitar **context queries**.
+During planning, if a service agent needs information from other services (e.g., "what does users-api return?"), it can request **context queries**.
 
-**Flujo**:
-1. Service-agent detecta necesidad → Escribe PLAN provisional
-2. Reporta `status: "needs_context"` con queries pendientes
-3. Orchestrator spawnea **query-only agents** en servicios adyacentes
-4. Re-ejecuta service-agent con el contexto obtenido
-5. Completa PLAN.md final
+**Flow**:
+1. Service agent detects need → Writes provisional PLAN
+2. Reports `status: "needs_context"` with pending queries
+3. Orchestrator spawns **query-only agents** in adjacent services
+4. Re-runs service agent with obtained context
+5. Completes final PLAN.md
 
-**Ventaja**: No mapeas servicios que no modificas, pero obtienes contexto preciso cuando lo necesitas.
+**Advantage**: You don't map services you don't modify, but get precise context when needed.
 
 ### Adjustments (Wave 4b)
 
-Después de Wave 4 (tests), si hay fallos menores o necesitas aclaraciones:
+After Wave 4 (tests), if there are minor failures or you need clarifications:
 
-**Modo Explain**:
-- Pregunta: "¿Por qué falla este test?"
-- Service-agent investiga y explica (read-only)
+**Explain Mode**:
+- Question: "Why does this test fail?"
+- Service agent investigates and explains (read-only)
 
-**Modo Quick Fix**:
-- Ajuste menor: "Arregla el mock en el test"
-- Fix de typo, validación, import faltante
-- **No** cambios arquitectónicos grandes
-- Se apenda a CHANGES.md
-- Re-corre tests afectados
+**Quick Fix Mode**:
+- Minor adjustment: "Fix the mock in the test"
+- Typo fix, validation, missing import
+- **No** large architectural changes
+- Appended to CHANGES.md
+- Re-runs affected tests
 
 ---
 
-## Primeros Pasos
+## First Steps
 
-### 1. Verificar Service Registry
+### 1. Verify Service Registry
 ```bash
-# Lee ~/.agentbus/services.json
-# Debe contener los servicios que vas a usar
+# Read ~/.agentbus/services.json
+# Must contain the services you will use
 ```
 
-### 2. Plan ID Auto-Generado
-El orchestrator escanea `.agentbus-plans/` en cada servicio para:
-- Encontrar el número de plan más alto existente
-- Sugerir el siguiente número secuencial (sin gaps)
-- Validar consistencia entre todos los servicios
+### 2. Auto-Generated Plan ID
+The orchestrator scans `.agentbus-plans/` in each service to:
+- Find the highest existing plan number
+- Suggest the next sequential number (no gaps)
+- Validate consistency across all services
 
-Ejemplo: Si existe `003-feature`, el nuevo será `004-nuevo-feature`.
+Example: If `003-feature` exists, the new one will be `004-new-feature`.
 
-### 3. Ejecutar Flujo
+### 3. Execute Flow
 ```
-# Paso 1: Inicializar (auto-detecta número de plan)
-/agentbus orchestrator "descripción del feature" svc1 svc2
+# Step 1: Initialize (auto-detects plan number)
+/agentbus orchestrator "feature description" svc1 svc2
 
-# Paso 2: Wave 1 (Deep Mapping - 5 documentos)
+# Step 2: Wave 1 (Deep Mapping - 5 documents)
 /agentbus orchestrator --continue 004-feature-slug
 
-# Paso 3: Wave 1.5 (Design Alignment Checkpoint)
-#         Se ejecuta automáticamente, puede pedir input
+# Step 3: Wave 1.5 (Design Alignment Checkpoint)
+#         Runs automatically, may ask for input
 
-# Paso 4-N: Continuar waves restantes
+# Step 4: Wave 2 (Plan Refinement)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 5: Wave 2.5 (Plan QA & Concerns — NEW)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 6-N: Continue remaining waves
 /agentbus orchestrator --continue 004-feature-slug
 ```
 
 ---
 
-## Documentación Detallada
+## Detailed Documentation
 
-- **Protocolo completo**: `@skills/agentbus orchestrator/SKILL.md`
+- **Complete protocol**: `@skills/agentbus orchestrator/SKILL.md`
 - **Map Codebase**: `@skills/agentbus map-codebase/SKILL.md`
 - **Service agent**: `@skills/agentbus service agent/SKILL.md`
 - **Review**: `@skills/agentbus review/SKILL.md`
@@ -195,4 +221,4 @@ Ejemplo: Si existe `003-feature`, el nuevo será `004-nuevo-feature`.
 
 ## Version
 
-AgentBus Skills v2.0.0 (Deep Mapping)
+AgentBus Skills v3.0.0 (Deep Mapping + Plan QA)
