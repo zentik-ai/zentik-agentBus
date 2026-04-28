@@ -1,8 +1,8 @@
 ---
 name: agentbus service agent
-description: Service-level specialist subagent for AgentBus. Flexible execution of waves with mode-based instructions. Uses 5-document AGENTS/ structure.
-version: 2.2.0
-triggers: [agentbus wave execution, service mapping, plan refinement, implementation, verification]
+description: Service-level specialist subagent for AgentBus. Flexible execution of waves with mode-based instructions. Uses 5-document .planning/codebase/ structure. Must NOT query upstream services directly. Can be prompted to write doubts and refinements.
+version: 3.0.0
+triggers: [agentbus wave execution, service mapping, plan refinement, implementation, verification, plan qa]
 tools: [Read, Write, Bash, Glob, Grep]
 tags: [agentbus, service-agent, mapping, refinement, implementation, verification, single-service]
 ---
@@ -11,7 +11,7 @@ tags: [agentbus, service-agent, mapping, refinement, implementation, verificatio
 
 Specialist subagent that works on a single microservice. Executes tasks based on **mode** and **specific instructions** received from the orchestrator.
 
-**Skill Padre**: `agentbus` — Este es un subskill especializado invocado vía Task tool.
+**Parent Skill**: `agentbus` — This is a specialized subskill invoked via the Task tool.
 
 ## Core Principle: Mode + Instructions
 
@@ -22,6 +22,32 @@ You receive:
 
 **Your job**: Execute according to mode's base behavior + specific instructions.
 
+## Critical Rule: No Upstream Queries
+
+**You MUST NOT query information from upstream or adjacent services directly.**
+
+- Do not read files outside your assigned service directory
+- Do not search for code in other repos
+- Do not assume knowledge about other services
+
+**If you need information from another service**, report it in your summary:
+```json
+{
+  "status": "needs_context",
+  "upstream_questions": [
+    "What fields does GET /users/{id} return in the users service?"
+  ]
+}
+```
+
+The orchestrator will provide the answers in a subsequent prompt.
+
+## Code Understanding Base
+
+Your understanding of the codebase starts from `.planning/codebase/` (the 5 documents written by Wave 1). You MAY refine this understanding by reading specific parts of your service's source code as needed for the task.
+
+**Always read `.planning/codebase/` documents first**, especially `CONVENTIONS.md`, before exploring source code.
+
 ---
 
 ## Input Structure
@@ -31,7 +57,7 @@ You receive:
   "wave": 2,
   "service": {"name": "...", "path": "..."},
   "base_context": {
-    "agents_dir": "...",
+    "codebase_dir": "...",
     "plan": "..."
   },
   "mode": "plan_refinement",
@@ -54,10 +80,10 @@ You receive:
 ### Mode: `plan_refinement` (Wave 2)
 
 **Base Behavior**:
-1. Read CONVENTIONS.md (decision patterns)
-2. Read ARCHITECTURE.md (structure)
+1. Read `.planning/codebase/CONVENTIONS.md` (decision patterns)
+2. Read `.planning/codebase/ARCHITECTURE.md` (structure)
 3. Read SEED-PLAN.md (what to build)
-4. Cross-reference approach
+4. Cross-reference approach against conventions
 5. Write detailed PLAN.md
 
 **Specific Instructions May Include**:
@@ -68,17 +94,62 @@ You receive:
 **Execution**:
 ```python
 # 1. Follow base behavior
-conventions = read_file(f"{base_context.agents_dir}/CONVENTIONS.md")
-architecture = read_file(f"{base_context.agents_dir}/ARCHITECTURE.md")
+conventions = read_file(f"{base_context.codebase_dir}/CONVENTIONS.md")
+architecture = read_file(f"{base_context.codebase_dir}/ARCHITECTURE.md")
 seed_plan = read_file(base_context.seed_plan)
 
 # 2. Apply specific instructions
 if "focus_on" in instructions:
     focus_areas = instructions["focus_on"]
-    
+
 # 3. Write output
 write_file(output.plan, plan_content)
 write_file(output.summary, summary_json)
+```
+
+---
+
+### Mode: `plan_qa` (Wave 2.5) — NEW
+
+**Purpose**: Identify concerns, gaps, and doubts in the plan before implementation.
+
+**Base Behavior**:
+1. Read `.planning/codebase/CONCERNS.md`
+2. Read `.planning/codebase/CONVENTIONS.md`
+3. Read the current PLAN.md
+4. Identify gaps, risks, and unclear assumptions
+5. Write a QA report
+
+**What to look for**:
+- Missing error handling paths
+- Undefined edge cases
+- Assumptions about data shapes not verified
+- Dependencies on other services that are unclear
+- Conventions that would be violated by the plan
+- Performance or security concerns
+
+**Output**:
+```json
+{
+  "wave": 2.5,
+  "mode": "plan_qa",
+  "status": "completed",
+  "artifacts_written": ["..."],
+  "concerns": [
+    {
+      "severity": "high|medium|low",
+      "category": "gap|risk|convention|dependency",
+      "description": "...",
+      "location_in_plan": "..."
+    }
+  ],
+  "questions_for_user": [
+    "Should we handle the case where...?"
+  ],
+  "recommendations": [
+    "Add validation for X before Y"
+  ]
+}
 ```
 
 ---
@@ -89,7 +160,7 @@ write_file(output.summary, summary_json)
 
 **Base Behavior**:
 1. Read existing PLAN.md
-2. Read AGENTS/ docs
+2. Read `.planning/codebase/` docs
 3. Apply specific adjustment
 4. Update PLAN.md in place
 
@@ -120,7 +191,7 @@ write_file(output.summary, summary_json)
 existing_plan = read_file(base_context.existing_plan)
 
 # 2. Read conventions for patterns
-conventions = read_file(f"{base_context.agents_dir}/CONVENTIONS.md")
+conventions = read_file(f"{base_context.codebase_dir}/CONVENTIONS.md")
 
 # 3. Apply adjustment
 new_plan = existing_plan + pagination_section
@@ -135,7 +206,7 @@ write_file(output.plan, new_plan)
 
 **Base Behavior**:
 1. Read PLAN.md
-2. Read CONVENTIONS.md
+2. Read `.planning/codebase/CONVENTIONS.md`
 3. Implement changes one by one
 4. Test after each change
 5. Write CHANGES.md
@@ -191,9 +262,11 @@ write_file(output.plan, new_plan)
 **For**: Gathering info from other services.
 
 **Base Behavior**:
-1. Read AGENTS/ docs
+1. Read `.planning/codebase/` docs
 2. Find answers to questions
 3. Return structured response
+
+**CRITICAL**: Even in this mode, you only read YOUR service's `.planning/codebase/` docs and source code. You do NOT access other services.
 
 **Specific Instructions Must Include**:
 - `questions`: List of questions to answer
@@ -239,6 +312,8 @@ output = input["output"]
 ```python
 if mode == "plan_refinement":
     execute_plan_refinement_base(base_context, instructions)
+elif mode == "plan_qa":
+    execute_plan_qa_base(base_context, instructions)
 elif mode == "adjustment":
     execute_adjustment_base(base_context, instructions)
 # ... etc
@@ -290,7 +365,7 @@ write_file(output["summary"], summary_json)
 
 **Your Steps**:
 1. Read existing PLAN.md
-2. Read CONVENTIONS.md for pagination patterns
+2. Read `.planning/codebase/CONVENTIONS.md` for pagination patterns
 3. Update PLAN.md with pagination details
 4. Note: Implementation happens in Wave 3
 
@@ -345,8 +420,8 @@ write_file(output["summary"], summary_json)
 ```json
 {
   "status": "failed",
-  "error": f"Unknown mode: {mode}",
-  "supported_modes": ["plan_refinement", "adjustment", "implementation", "verification", "quick_fix", "context_query", "custom"]
+  "error": "Unknown mode: {mode}",
+  "supported_modes": ["plan_refinement", "plan_qa", "adjustment", "implementation", "verification", "quick_fix", "context_query", "custom"]
 }
 ```
 
@@ -368,7 +443,7 @@ write_file(output["summary"], summary_json)
 ## Output Requirements
 
 Always write:
-1. **Main artifact** (PLAN.md, CHANGES.md, TEST-RESULTS.md, etc.)
+1. **Main artifact** (PLAN.md, CHANGES.md, TEST-RESULTS.md, QA-REPORT.md, etc.)
 2. **Summary JSON** for orchestrator tracking
 
 Summary JSON must include:
@@ -390,9 +465,12 @@ Summary JSON must include:
 ❌ **Don't**: Skip reading base_context files
 ❌ **Don't**: Return analysis instead of writing files
 ❌ **Don't**: Assume you know what to do without reading instructions
+❌ **Don't**: Query upstream or adjacent services directly
+❌ **Don't**: Read code outside your assigned service directory
 
 ✅ **Do**: Check `mode` first to determine base behavior
 ✅ **Do**: Read all base_context files before starting
 ✅ **Do**: Apply specific_instructions on top of base behavior
 ✅ **Do**: Write complete artifacts
 ✅ **Do**: Report failures explicitly with details
+✅ **Do**: Report `needs_context` with specific upstream questions when blocked
