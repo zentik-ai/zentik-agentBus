@@ -9,22 +9,23 @@ This project removes the "developer as messenger" problem when understanding and
 Instead of accumulating state in memory, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1:   Service Mapping         →  AGENTS/ (5 docs per service)
-Wave 1.5: Design Alignment        →  Validated approach decisions  
-Wave 2:   Plan Refinement         →  PLAN.md (plan the change)
-Wave 2.5: Plan Alignment          →  Cross-service consistency check
-Wave 3:   Implementation          →  Code modified (no commits yet)
-Wave 3.5: Contract Validation     →  Deep implementation check (optional)
-Wave 4:   Verification            →  TEST-RESULTS.md (verify it works)
-Wave 4b:  Adjustments (opt)       →  Minor fixes + clarifications
-Wave 5:   Wrap-up (opt)           →  Git commits + deployment prep
+Wave 1:   Service Mapping          →  .planning/codebase/ (5 docs per service)
+Wave 1.5: Design Alignment         →  Validated approach decisions
+Wave 2:   Plan Refinement          →  PLAN.md (plan the change)
+Wave 2.5: Plan QA & Concerns       →  QA-REPORT.md (surface gaps for user input)
+Wave 2.6: Plan Alignment           →  Cross-service consistency check
+Wave 3:   Implementation           →  Code modified (no commits yet)
+Wave 3.5: Contract Validation      →  Deep implementation check (optional)
+Wave 4:   Verification             →  TEST-RESULTS.md (verify it works)
+Wave 4b:  Adjustments (opt)        →  Minor fixes + clarifications
+Wave 5:   Wrap-up (opt)            →  Git commits + deployment prep
 ```
 
 Benefits:
 - **Context efficiency**: Orchestrator reads only what it needs
 - **Auditability**: Complete history in version-controlled files
 - **Resumability**: Failed waves can be retried independently
-- **Reusability**: AGENTS/ serves as ongoing service documentation
+- **Reusability**: `.planning/codebase/` serves as ongoing service documentation
 
 ## Repository Layout
 
@@ -37,10 +38,11 @@ agentbus-skills/
 │   │   │   └── SKILL.md
 │   │   ├── service-agent/        # Per-service specialist
 │   │   │   └── SKILL.md
-│   │   └── review/               # Consistency checker
+│   │   ├── review/               # Consistency checker
+│   │   │   └── SKILL.md
+│   │   └── map-codebase/         # Deep codebase mapper
 │   │       └── SKILL.md
-│   └── map-codebase/             # Codebase exploration
-│       └── SKILL.md
+│   └── SKILL.md                  # Root skill manifest
 ```
 
 ### Skill Hierarchy
@@ -58,10 +60,11 @@ agentbus-skills/
 
 | Wave | Purpose | Key Output |
 |------|---------|------------|
-| 1 | Map services | `AGENTS/` (5 docs) |
+| 1 | Map services | `.planning/codebase/` (5 docs) |
 | 1.5 | Validate approaches | Design decisions |
 | 2 | Create plans | `PLAN.md` |
-| 2.5 | Check consistency | Alignment report |
+| 2.5 | Surface concerns | `QA-REPORT.md` + user input |
+| 2.6 | Check consistency | Alignment report |
 | 3 | Implement changes | Modified code + `CHANGES.md` |
 | 4 | Verify with tests | `TEST-RESULTS.md` |
 | 4b | Adjust/fix minor issues | Updated code |
@@ -84,15 +87,17 @@ workspace/
 │           └── {service}.json
 │
 ├── payments-service/             # Service repo
-│   └── .agentbus/
-│       └── AGENTS/               # ← Wave 1: 5 service documents
+│   └── .planning/
+│       └── codebase/             # ← Wave 1: 5 service documents
 │           ├── STACK.md
 │           ├── ARCHITECTURE.md
 │           ├── STRUCTURE.md
 │           ├── CONVENTIONS.md
 │           └── CONCERNS.md
+│   └── .agentbus-plans/
 │       └── 001-feature-slug/     # Plan folder
 │           ├── PLAN.md           # Written by Wave 2
+│           ├── QA-REPORT.md      # Written by Wave 2.5
 │           ├── CHANGES.md        # Written by Wave 3
 │           ├── TEST-RESULTS.md   # Written by Wave 4
 │           └── COMMITS.md        # Written by Wave 5 (optional)
@@ -112,7 +117,7 @@ Before using any AgentBus commands, **you must initialize the skill** so the LLM
 ```
 
 This loads the base skill which provides context about:
-- The 7-wave execution model
+- The wave execution model
 - How to route to subskills (`agentbus orchestrator`, `agentbus review`)
 - When to use AgentBus vs other skills
 
@@ -180,7 +185,7 @@ The orchestrator:
 
 **Fuzzy matching examples**:
 - "bot de WA" → exitus-bot-wa
-- "tools" → exitus-agent-tools  
+- "tools" → exitus-agent-tools
 - "api gateway" → exitus-api-gateway
 
 ### Phase 3: Wave 1 — Service Mapping
@@ -193,7 +198,7 @@ Run orchestrator again to start mapping:
 ```
 
 Each subagent writes:
-- `{service}/.agentbus/AGENTS/*.md` (5 documents, creates or updates)
+- `{service}/.planning/codebase/*.md` (5 documents, creates or updates)
 - Summary JSON to orchestrator workspace
 
 ### Phase 4: Wave 2 — Plan Refinement
@@ -203,11 +208,27 @@ Each subagent writes:
 ```
 
 Each subagent:
-- Reads `AGENTS/` documents from its service (especially CONVENTIONS.md)
+- Reads `.planning/codebase/` documents from its service (especially CONVENTIONS.md)
 - Reads `SEED-PLAN.md`
 - Writes refined `PLAN.md` to service repo
 
-### Phase 5: Wave 3 — Implementation
+### Phase 5: Wave 2.5 — Plan QA & Concerns
+
+```bash
+/agentbus-orchestrator --continue 001-remove-field
+```
+
+Each subagent:
+- Reads `PLAN.md` and `.planning/codebase/` docs
+- Identifies concerns, gaps, and doubts
+- Writes `QA-REPORT.md`
+
+The orchestrator:
+- Consolidates all QA reports
+- Presents questions and concerns to you
+- Refines plans based on your input
+
+### Phase 6: Wave 3 — Implementation
 
 ⚠️ **Destructive** — Modifies source code (but doesn't commit yet)
 
@@ -222,7 +243,7 @@ Each subagent:
 
 The orchestrator will ask for confirmation before proceeding.
 
-### Phase 6: Wave 4 — Verification
+### Phase 7: Wave 4 — Verification
 
 ```bash
 /agentbus-orchestrator --continue 001-remove-field
@@ -233,7 +254,7 @@ Each subagent:
 - Runs tests
 - Writes `TEST-RESULTS.md` with results
 
-### Phase 7: Review
+### Phase 8: Review
 
 ```bash
 /agentbus-review --feature-slug "001-remove-field"
@@ -284,6 +305,7 @@ If a subagent fails:
 
 - **No helper scripts required** for core orchestration logic
 - Skills use `Task` tool to spawn parallel subagents
-- AGENTS/ persists as living service documentation (5 specialized documents)
+- `.planning/codebase/` persists as living service documentation (5 specialized documents)
 - Plans are kept in repos for visibility/auditability
 - Current version favors simplicity over strong concurrency controls
+- The orchestrator acts as a solution architect: it understands cross-service implications but **never reads code directly** — it always delegates to specialist agents
