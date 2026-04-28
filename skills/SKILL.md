@@ -1,7 +1,7 @@
 ---
 name: agentbus
-description: Cross-service planning system for LLM coding agents. Orchestrates multi-wave planning across microservices with evidence-based workflow.
-version: 1.0.0
+description: Cross-service planning system for LLM coding agents. Orchestrates multi-wave planning across microservices with evidence-based workflow. Updated for .planning/codebase/ output and Plan QA stage.
+version: 2.0.0
 triggers: [cross-service feature, multi-service planning, service architecture]
 tools: [Read, Write, Bash, Task]
 ---
@@ -28,21 +28,23 @@ Use AgentBus when you need to:
 Instead of passing data through responses, AgentBus writes artifacts at each stage:
 
 ```
-Wave 1:   Service Mapping         →  AGENTS/ (5 docs per service)
-Wave 2:   Plan Refinement         →  PLAN.md (per service)
-Wave 2.5: Plan Alignment          →  Cross-service consistency check
-Wave 3:   Implementation          →  Modified code + CHANGES.md
-Wave 3.5: Contract Validation     →  Deep implementation check (optional)
-Wave 4:   Verification            →  TEST-RESULTS.md
-Wave 4b:  Adjustments (opt)       →  Minor fixes + clarifications
-Wave 5:   Wrap-up (opt)           →  Git commits
+Wave 1:   Service Mapping          →  .planning/codebase/ (5 docs per service)
+Wave 1.5: Design Alignment         →  Validated approach decisions
+Wave 2:   Plan Refinement          →  PLAN.md (per service)
+Wave 2.5: Plan QA & Concerns       →  QA-REPORT.md (per service) + user input
+Wave 2.6: Plan Alignment           →  Cross-service consistency check
+Wave 3:   Implementation           →  Modified code + CHANGES.md
+Wave 3.5: Contract Validation      →  Deep implementation check (optional)
+Wave 4:   Verification             →  TEST-RESULTS.md
+Wave 4b:  Adjustments (opt)        →  Minor fixes + clarifications
+Wave 5:   Wrap-up (opt)            →  Git commits
 ```
 
 **Benefits:**
 - **Context efficiency**: Orchestrator reads only what it needs
 - **Auditability**: Complete history in version-controlled files
 - **Resumability**: Failed waves can be retried independently
-- **Reusability**: AGENTS/ serves as living service documentation
+- **Reusability**: `.planning/codebase/` serves as living service documentation
 
 ## Quick Start Commands
 
@@ -54,7 +56,7 @@ Wave 5:   Wrap-up (opt)           →  Git commits
 /agentbus
 ```
 
-This provides context about the 7-wave model, routing, and conventions.
+This provides context about the wave model, routing, and conventions.
 
 ### Step 2: Local Service Repositories (Required)
 
@@ -95,12 +97,12 @@ Runs the next wave based on `status.json`.
 
 ### Wave 1: Service Mapping
 
-**Purpose**: Create/update AGENTS/ documentation in each service
+**Purpose**: Create/update `.planning/codebase/` documentation in each service
 
 **What happens:**
 - Orchestrator spawns parallel subagents (one per service)
 - Each subagent maps codebase: stack, architecture, APIs, DB, testing
-- Writes 5 documents to `{service}/.agentbus/AGENTS/`:
+- Writes 5 documents to `{service}/.planning/codebase/`:
   - STACK.md — Technology stack
   - ARCHITECTURE.md — Patterns and data flow
   - STRUCTURE.md — Directory layout
@@ -108,19 +110,32 @@ Runs the next wave based on `status.json`.
   - CONCERNS.md — Tech debt and risks
 - Writes summary JSON to orchestrator workspace
 
-**Output**: `{service}/.agentbus/AGENTS/*.md`
+**Output**: `{service}/.planning/codebase/*.md`
 
 ### Wave 2a: Plan Refinement
 
 **Purpose**: Create detailed implementation plan per service
 
 **What happens:**
-- Subagents read AGENTS/ documents (especially CONVENTIONS.md)
+- Subagents read `.planning/codebase/` documents (especially CONVENTIONS.md)
 - Read SEED-PLAN.md for context
 - Explore relevant code files
 - Write PLAN.md with specific changes
 
 **Output**: `{service}/.agentbus-plans/{plan-id}/PLAN.md`
+
+### Wave 2.5: Plan QA & Concerns — NEW
+
+**Purpose**: Surface concerns, gaps, and doubts before implementation
+
+**What happens:**
+- Orchestrator spawns specialist agents in `plan_qa` mode
+- Each agent reads their PLAN.md and `.planning/codebase/` docs
+- Each agent writes QA-REPORT.md with concerns, gaps, and questions
+- Orchestrator consolidates and presents to the user for input
+- Plans are refined based on user answers
+
+**Output**: `{service}/.agentbus-plans/{plan-id}/QA-REPORT.md`
 
 ### Wave 2b: Context Queries (Optional)
 
@@ -213,11 +228,17 @@ workspace/                          # parent folder of all repos
 │           └── {service}.json
 │
 ├── payments-service/               # service repo
-│   └── .agentbus/
-│       └── AGENTS/                 # ← Wave 1: 5 service documents
+│   └── .planning/
+│       └── codebase/               # ← Wave 1: 5 service documents
+│           ├── STACK.md
+│           ├── ARCHITECTURE.md
+│           ├── STRUCTURE.md
+│           ├── CONVENTIONS.md
+│           └── CONCERNS.md
 │   └── .agentbus-plans/
 │       └── 004-feature/            # ← Wave 2-5: plan folder
 │           ├── PLAN.md             # ← Wave 2: refined plan
+│           ├── QA-REPORT.md        # ← Wave 2.5: QA concerns
 │           ├── CHANGES.md          # ← Wave 3: implementation log
 │           ├── TEST-RESULTS.md     # ← Wave 4: test results
 │           └── COMMITS.md          # ← Wave 5: commit log (optional)
@@ -260,7 +281,7 @@ This creates the orchestrator workspace with sequential plan ID.
 You: Start mapping
 /agentbus-orchestrator --continue 004-audit-logging
 
-This spawns parallel subagents to create AGENTS/ documents in each service.
+This spawns parallel subagents to create .planning/codebase/ documents in each service.
 Wait for completion.
 ```
 
@@ -273,18 +294,28 @@ You: Refine plans
 This spawns subagents to write PLAN.md in each service.
 ```
 
-### 4. Wave 2b (Context Queries - if needed)
+### 4. Wave 2.5 (Plan QA & Concerns) — NEW
+
+```
+You: Run QA
+/agentbus-orchestrator --continue 004-audit-logging
+
+This spawns specialist agents to identify concerns and gaps.
+The orchestrator will present consolidated questions for your input.
+```
+
+### 5. Wave 2b (Context Queries - if needed)
 
 If a service agent needs info from adjacent services:
 
 ```
 Orchestrator: cronjob-api needs context from users-api
-¿Ejecutar context queries? (yes/no): yes
+Run context queries? (yes/no): yes
 
 This queries users-api without adding it to the plan.
 ```
 
-### 5. Run Wave 3 (Implementation)
+### 6. Run Wave 3 (Implementation)
 
 ```
 You: Implement changes
@@ -293,7 +324,7 @@ You: Implement changes
 ⚠️ This modifies source code but does NOT commit.
 ```
 
-### 6. Run Wave 4 (Verification)
+### 7. Run Wave 4 (Verification)
 
 ```
 You: Verify implementation
@@ -302,11 +333,11 @@ You: Verify implementation
 This runs tests and creates TEST-RESULTS.md.
 ```
 
-### 7. Wave 4b (Adjustments - if needed)
+### 8. Wave 4b (Adjustments - if needed)
 
 ```
 Orchestrator: 2 tests failed in cronjob-api
-¿Ajustes o preguntas? (yes/no): yes
+Adjustments or questions? (yes/no): yes
 
 You: "Fix the mock in test_validation_email"
 → Quick fix applied
@@ -314,7 +345,7 @@ You: "Fix the mock in test_validation_email"
 → ✅ PASS
 ```
 
-### 8. Wave 5 (Wrap-up)
+### 9. Wave 5 (Wrap-up)
 
 ```
 You: Create commits
@@ -346,9 +377,9 @@ You: Create commits
 
 ## Key Concepts
 
-### AGENTS/ (5 Documents)
+### .planning/codebase/ (5 Documents)
 
-Living service documentation written by Wave 1. Located at `{service}/.agentbus/AGENTS/`:
+Living service documentation written by Wave 1. Located at `{service}/.planning/codebase/`:
 
 | Document | Content | Purpose |
 |----------|---------|---------|
@@ -358,7 +389,7 @@ Living service documentation written by Wave 1. Located at `{service}/.agentbus/
 | CONVENTIONS.md | Implementation patterns | **Choose the right approach** |
 | CONCERNS.md | Tech debt, risks | Avoid pitfalls |
 
-**Reusable**: AGENTS/ is updated on each Wave 1, serving as documentation for future features.
+**Reusable**: `.planning/codebase/` is updated on each Wave 1, serving as documentation for future features.
 
 **CRITICAL**: Always read CONVENTIONS.md first — it contains decision patterns for choosing approaches.
 
@@ -370,6 +401,14 @@ Feature-specific implementation plan written by Wave 2. Includes:
 - Testing strategy
 - Dependencies on other services
 - Rollback plan
+
+### QA-REPORT.md
+
+Quality assurance report written by Wave 2.5. Includes:
+- Concerns identified by the specialist agent
+- Gaps in the plan
+- Questions for the user
+- Recommendations for refinement
 
 ### CHANGES.md
 
@@ -395,27 +434,30 @@ Tracking file that enables resume/retry. Contains:
 
 ## Anti-Patterns to Avoid
 
-❌ **Don't**: Run all waves in one session (context exhaustion)  
+❌ **Don't**: Run all waves in one session (context exhaustion)
 ✅ **Do**: Run one wave at a time, review, then continue
 
-❌ **Don't**: Modify AGENTS/ documents manually during planning  
+❌ **Don't**: Modify `.planning/codebase/` documents manually during planning
 ✅ **Do**: Let Wave 1 subagent update them
 
-❌ **Don't**: Skip Wave 4 (verification)  
+❌ **Don't**: Skip Wave 2.5 (Plan QA) — user input prevents bad assumptions
+✅ **Do**: Always run Plan QA and address concerns before implementation
+
+❌ **Don't**: Skip Wave 4 (verification)
 ✅ **Do**: Always verify before committing
 
-❌ **Don't**: Add too many services (>5) without user confirmation  
+❌ **Don't**: Add too many services (>5) without user confirmation
 ✅ **Do**: Propose list, let user confirm/adjust
 
-❌ **Don't**: Use Wave 4b for major architectural changes  
+❌ **Don't**: Use Wave 4b for major architectural changes
 ✅ **Do**: Create new plan if architecture needs to change
 
 ## Getting Help
 
-- **Orchestrator protocol**: `@skills/agentbus-orchestrator/SKILL.md`
-- **Service agent protocol**: `@skills/agentbus-service-agent/SKILL.md`
-- **Review protocol**: `@skills/agentbus-review/SKILL.md`
+- **Orchestrator protocol**: `@skills/agentbus orchestrator/SKILL.md`
+- **Service agent protocol**: `@skills/agentbus service agent/SKILL.md`
+- **Review protocol**: `@skills/agentbus review/SKILL.md`
 
 ## Version
 
-AgentBus Skills v1.0.0 — Evidence-Based Wave Model
+AgentBus Skills v2.0.0 — Evidence-Based Wave Model with Plan QA
