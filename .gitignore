@@ -5,3 +5,5 @@ smoke-home/
 # Python cache files
 __pycache__/
 *.pyc
+
+AGENTS.md
