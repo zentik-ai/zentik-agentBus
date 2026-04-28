@@ -1,7 +1,7 @@
 ---
 name: agentbus map-codebase
-description: Deep service mapper for AgentBus. Explores a service codebase and generates 5 specialized documents (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, CONCERNS) in .agentbus/AGENTS/. Used by the orchestrator during Wave 1.
-version: 1.0.0
+description: Deep service mapper for AgentBus. Explores a service codebase and generates 5 specialized documents (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, CONCERNS) in .planning/codebase/. Used by the orchestrator during Wave 1.
+version: 2.0.0
 triggers: [agentbus mapping, service analysis, codebase exploration]
 tools: [Read, Write, Bash, Glob, Grep]
 tags: [agentbus, mapping, service-analysis, documentation]
@@ -9,9 +9,9 @@ tags: [agentbus, mapping, service-analysis, documentation]
 
 # AgentBus Map Codebase
 
-Deep service mapper that explores a codebase and generates structured documentation in `.agentbus/AGENTS/`. This is a subskill invoked by the orchestrator during Wave 1 (Service Mapping).
+Deep service mapper that explores a codebase and generates structured documentation in `.planning/codebase/`. This is a subskill invoked by the orchestrator during Wave 1 (Service Mapping).
 
-**Skill Padre**: `agentbus` — Este es un subskill especializado invocado vía Task tool por `agentbus orchestrator`.
+**Parent Skill**: `agentbus` — This is a specialized subskill invoked via the Task tool by `agentbus orchestrator`.
 
 ## Purpose
 
@@ -21,8 +21,8 @@ Replace the monolithic `AGENTS.md` approach with 5 specialized documents that pr
 
 ```
 {service}/
-└── .agentbus/
-    └── AGENTS/                    # 5 specialized documents
+└── .planning/
+    └── codebase/                  # 5 specialized documents
         ├── STACK.md              # Technology stack and dependencies
         ├── ARCHITECTURE.md       # Patterns, layers, data flow
         ├── STRUCTURE.md          # Directory layout, file placement
@@ -39,7 +39,7 @@ You are invoked by the AgentBus Orchestrator during Wave 1. You receive:
   "service_name": "service-name",
   "service_path": "/absolute/path/to/service",
   "outputs": {
-    "agents_dir": "/absolute/path/to/service/.agentbus/AGENTS",
+    "codebase_dir": "/absolute/path/to/service/.planning/codebase",
     "summary_json": "/absolute/path/to/orchestrator/service-outputs/service.json"
   }
 }
@@ -119,7 +119,7 @@ Write the 5 documents following the templates below.
 ```markdown
 # Technology Stack
 
-**Service:** [service-name]  
+**Service:** [service-name]
 **Analysis Date:** [YYYY-MM-DD]
 
 ---
@@ -174,7 +174,7 @@ Write the 5 documents following the templates below.
 ```markdown
 # Architecture
 
-**Service:** [service-name]  
+**Service:** [service-name]
 **Analysis Date:** [YYYY-MM-DD]
 
 ---
@@ -237,7 +237,7 @@ Write the 5 documents following the templates below.
 ```markdown
 # Codebase Structure
 
-**Service:** [service-name]  
+**Service:** [service-name]
 **Analysis Date:** [YYYY-MM-DD]
 
 ---
@@ -292,7 +292,7 @@ Write the 5 documents following the templates below.
 ```markdown
 # Coding Conventions & Patterns
 
-**Service:** [service-name]  
+**Service:** [service-name]
 **Analysis Date:** [YYYY-MM-DD]
 
 ---
@@ -404,7 +404,7 @@ Write the 5 documents following the templates below.
 ```markdown
 # Codebase Concerns & Technical Debt
 
-**Service:** [service-name]  
+**Service:** [service-name]
 **Analysis Date:** [YYYY-MM-DD]
 
 ---
@@ -478,7 +478,7 @@ Write the 5 documents following the templates below.
 
 Always write:
 
-1. **Five markdown documents** in `.agentbus/AGENTS/`
+1. **Five markdown documents** in `.planning/codebase/`
 2. **Summary JSON** for the orchestrator
 
 ### Summary JSON Format
@@ -489,11 +489,11 @@ Always write:
   "status": "completed",
   "service": "service-name",
   "artifacts_written": [
-    "/path/to/service/.agentbus/AGENTS/STACK.md",
-    "/path/to/service/.agentbus/AGENTS/ARCHITECTURE.md",
-    "/path/to/service/.agentbus/AGENTS/STRUCTURE.md",
-    "/path/to/service/.agentbus/AGENTS/CONVENTIONS.md",
-    "/path/to/service/.agentbus/AGENTS/CONCERNS.md"
+    "/path/to/service/.planning/codebase/STACK.md",
+    "/path/to/service/.planning/codebase/ARCHITECTURE.md",
+    "/path/to/service/.planning/codebase/STRUCTURE.md",
+    "/path/to/service/.planning/codebase/CONVENTIONS.md",
+    "/path/to/service/.planning/codebase/CONCERNS.md"
   ],
   "key_findings": [
     "Uses layered architecture with clear separation",
