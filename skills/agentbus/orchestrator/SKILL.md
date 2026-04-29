@@ -107,7 +107,7 @@ Wave 2.5: Plan QA & Concerns      →  QA-REPORT.md per service + user input
 Wave 2.6: Plan Alignment          →  Batch 1: High-level consistency (PLAN.md)
 Wave 3:   Implementation          →  Code modified (no commits)
 Wave 3.5: Contract Validation     →  Batch 2: Deep consistency (code) - Optional
-Wave 4:   Verification            →  TEST-RESULTS.md
+Wave 4:   Verification            →  VERIFICATION.md (primary) + TEST-RESULTS.md
 Wave 5:   Wrap-up (optional)      →  Git commits + final deployment prep
 ```
 
@@ -702,6 +702,86 @@ Options:
   [s] Skip Wave 3.5 — Don't run for this feature
 
 Your choice: _
+```
+
+---
+
+### Wave 4: Verification (Goal-Backward)
+
+**Purpose**: Verify that the goal was achieved, not just that tasks completed.
+
+**What happens**:
+- Orchestrator spawns specialist agents in `verification` mode
+- Each agent reads PLAN.md must_haves, CHANGES.md, and source code
+- Performs 3-level verification: Exists → Substantive → Wired
+- Writes VERIFICATION.md (primary output) with structured gaps
+- Also writes TEST-RESULTS.md (test suite results)
+
+**Outputs**:
+- `{service}/.agentbus-plans/{plan-id}/VERIFICATION.md` — goal-backward verification with gaps
+- `{service}/.agentbus-plans/{plan-id}/TEST-RESULTS.md` — test suite results
+
+**Orchestrator reads VERIFICATION.md frontmatter** to decide next steps:
+
+```python
+for service in services:
+    verification = read_file(f"/workspace/{service}/.agentbus-plans/{plan_id}/VERIFICATION.md")
+    status = parse_frontmatter(verification)["status"]
+
+    if status == "passed":
+        mark_service_ready(service)
+    elif status == "gaps_found":
+        gaps = parse_frontmatter(verification)["gaps"]
+        # Option A: Auto-fix small gaps via Wave 4b
+        # Option B: Re-run Wave 3 for large gaps
+        # Option C: Accept gaps and proceed (user decision)
+    elif status == "human_needed":
+        human_items = parse_frontmatter(verification)["human_verification"]
+        present_to_user(human_items)
+```
+
+**Decision flow after Wave 4**:
+
+```
+All services passed?
+  ├── YES → Ready for Wave 5 (or skip to user)
+  └── NO → Any gaps auto-fixable?
+            ├── YES → Wave 4b (quick fix) → Re-run Wave 4
+            └── NO → Re-run Wave 3 (implementation) for affected services
+```
+
+**Re-verification mode**: If VERIFICATION.md already exists with gaps, the service agent enters re-verification mode:
+- Failed items get full 3-level verification
+- Passed items get quick regression check only
+- Closed gaps are documented in `re_verification.gaps_closed`
+- New regressions are documented in `re_verification.regressions`
+
+```python
+Task(
+    subagent_name="agentbus service agent",
+    description=f"Wave 4: Verify {service}",
+    prompt=json.dumps({
+        "wave": 4,
+        "service": {"name": service, "path": f"/workspace/{service}"},
+        "mode": "verification",
+        "base_context": {
+            "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+            "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+            "previous_verification": f"/workspace/{service}/.agentbus-plans/{plan_id}/VERIFICATION.md"
+        },
+        "instructions": {
+            "run_tests": True,
+            "verify_must_haves": True,
+            "scan_antipatterns": True
+        },
+        "output": {
+            "verification": f"/workspace/{service}/.agentbus-plans/{plan_id}/VERIFICATION.md",
+            "test_results": f"/workspace/{service}/.agentbus-plans/{plan_id}/TEST-RESULTS.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-verification.json"
+        }
+    }),
+    readonly=False
+)
 ```
 
 ---
