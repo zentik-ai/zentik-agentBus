@@ -63,6 +63,40 @@ Task(
 
 ---
 
+## Context Budget & Wave Pacing
+
+Specialist agents degrade in quality as context pressure increases. You must account for this when designing waves.
+
+| Context Usage | Quality | State |
+|---------------|---------|-------|
+| 0-30% | PEAK | Thorough, comprehensive |
+| 30-50% | GOOD | Confident, solid work |
+| 50-70% | DEGRADING | Efficiency mode begins |
+| 70%+ | POOR | Rushed, minimal — **AVOID** |
+
+### Wave Design Rules
+
+- **One wave per session** — Never run multiple waves in one agent session
+- **Scope plans to ~50% context** — A single PLAN.md should be executable within 50% context budget
+- **Pause and resume** — If a service agent returns a checkpoint mid-wave, update `status.json` and spawn a fresh continuation agent
+- **Fresh agents for fresh work** — Don't reuse the same subagent context across waves
+
+### Checkpoint Handling
+
+When a service agent returns `status: "checkpoint"`:
+
+1. Present checkpoint to user with clear options
+2. Update `status.json` with checkpoint state
+3. On resume, spawn a **fresh** service agent with `<completed_tasks>` in the prompt
+4. The fresh agent verifies previous work, then continues
+
+**Checkpoint types to recognize:**
+- `human-verify`: User must visually/functionally verify something
+- `decision`: User must choose between implementation options
+- `human-action`: User must perform a manual step (auth, approval, etc.)
+
+---
+
 ## Wave Flow (Updated for Plan QA + Two-Batch Consistency)
 
 ```
@@ -117,6 +151,20 @@ Wave 5:   Wrap-up (optional)      →  Git commits + final deployment prep
 8. Proceeds to Wave 2.6
 
 **Output**: `{service}/.agentbus-plans/{plan-id}/QA-REPORT.md`
+
+### Checkpoint Types in Wave 2.5
+
+When presenting QA results to the user, use structured checkpoint types:
+
+- **`checkpoint:decision`** (most common): Implementation choices requiring user input
+  - "Should we handle 503 from analytics callback?"
+  - "Which approach: middleware or per-handler error handling?"
+
+- **`checkpoint:human-verify`**: After the orchestrator auto-fixes low-risk items, user verifies
+  - "I've auto-added null checks to 3 endpoints. Please confirm the approach looks correct."
+
+- **`checkpoint:human-action`** (rare in Wave 2.5): Only for truly manual steps
+  - "Please verify the `finished_at` field is nullable in the production database schema."
 
 ### Two-Batch Consistency Check
 
@@ -188,6 +236,73 @@ Task(
     readonly=False
 )
 ```
+
+---
+
+## PLAN.md Format Specification
+
+PLAN.md files written in Wave 2 should follow this structure. They are consumed by service agents in Wave 3 and verified in Wave 4.
+
+### Frontmatter (Optional but Recommended)
+
+```yaml
+---
+service: service-name
+plan_id: 001-feature
+version: 1.0.0
+must_haves:
+  truths:
+    - "User can log in with email and password"
+    - "Invalid credentials return 401 with clear error message"
+  artifacts:
+    - path: "src/api/auth/login.ts"
+      provides: "POST /api/auth/login endpoint"
+    - path: "src/services/auth.ts"
+      provides: "Password validation and JWT generation"
+  key_links:
+    - from: "src/api/auth/login.ts"
+      to: "src/services/auth.ts"
+      via: "import { validateCredentials }"
+---
+```
+
+### Task Anatomy
+
+Each task in the plan should have four fields:
+
+```markdown
+### Task 1: Implement login endpoint
+
+**Files:** `src/api/auth/login.ts`, `src/services/auth.ts`
+
+**Action:** Create POST endpoint accepting `{email, password}`. Validate email format and password length (8+ chars). Use bcrypt to compare against User table. Return JWT in httpOnly cookie with 15-min expiry. Use existing error pattern from CONVENTIONS.md (return `{error: string}` on 4xx).
+
+**Verify:** `curl -X POST /api/auth/login -d '{"email":"test@example.com","password":"password123"}'` returns 200 with Set-Cookie header.
+
+**Done:** Valid credentials return 200 + JWT cookie. Invalid credentials return 401 with `{error: "Invalid credentials"}`.
+```
+
+| Field | Purpose | Good Example | Bad Example |
+|-------|---------|--------------|-------------|
+| **Files** | Exact paths | `src/api/auth/login.ts` | "the auth files" |
+| **Action** | Specific instructions | "Create POST endpoint accepting... validates using... returns..." | "Add authentication" |
+| **Verify** | Proof of completion | `curl` returns 200 with Set-Cookie | "It works" |
+| **Done** | Measurable criteria | "Valid credentials return 200 + JWT cookie" | "Authentication is complete" |
+
+### Task Sizing
+
+Each task should take a specialist agent **15-60 minutes** to execute:
+
+| Duration | Action |
+|----------|--------|
+| < 15 min | Too small — combine with related task |
+| 15-60 min | Right size — single focused unit |
+| > 60 min | Too large — split into smaller tasks |
+
+**Signals a task is too large:**
+- Touches more than 5 files
+- Has multiple distinct "chunks" of work
+- The Action section is more than a paragraph
 
 ---
 
@@ -591,7 +706,9 @@ Your choice: _
 
 ---
 
-### Wave 4b: Quick Fix
+### Wave 4b: Quick Fix & Adjustments
+
+For small fixes after verification. Service agents apply Deviation Rules 1-3 automatically. Rule 4 (architectural) returns a checkpoint.
 
 ```python
 Task(
@@ -619,6 +736,11 @@ Task(
     readonly=False
 )
 ```
+
+**If the service agent returns a checkpoint in Wave 4b**, present it to the user:
+- `checkpoint:human-verify`: "The fix is applied. Please run the test to confirm."
+- `checkpoint:decision`: "The fix reveals a deeper issue. Two options: [A] quick patch [B] proper refactor. Which one?"
+- `checkpoint:human-action`: "The fix requires a manual database migration. Please run `npx prisma migrate dev` and type 'done'."
 
 ### Custom Scenario: Refactor Error Handling
 
