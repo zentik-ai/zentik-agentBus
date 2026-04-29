@@ -18,6 +18,7 @@ Markdown-first review protocol for cross-service plans. Reads artifacts directly
 Use this skill:
 - After Wave 2.6 (Plan Alignment) completes
 - After Wave 3 (Implementation) completes
+- After Wave 4 (Verification) completes
 - Before implementation starts
 - When adding a new service mid-flight
 - To verify consistency after plan updates
@@ -50,23 +51,27 @@ Read from orchestrator workspace:
 - `agentbus-orchestrator/{feature-slug}/status.json` — to find which services participate
 - `{service}/.agentbus-plans/{feature-slug}/PLAN.md` — implementation plans
 - `{service}/.agentbus-plans/{feature-slug}/QA-REPORT.md` — Wave 2.5 QA reports
+- `{service}/.agentbus-plans/{feature-slug}/VERIFICATION.md` — Wave 4 goal-backward verification
 
 ### 2. Read All Reports
 
 For each service:
 - Check if PLAN.md exists
 - Check if QA-REPORT.md exists
+- Check if VERIFICATION.md exists
 - Read and parse:
   - Verification status (ready/needs_work/blocked)
   - Blockers
   - Cross-service dependencies
   - Open questions
+  - Gaps from goal-backward verification
 
 ### 3. Run Consistency Checks
 
 #### Check 1: Report Completeness
 - [ ] All services have PLAN.md
 - [ ] All services have QA-REPORT.md (Wave 2.5)
+- [ ] All services have VERIFICATION.md (Wave 4)
 - [ ] No empty reports
 
 #### Check 2: Status Consistency
@@ -99,6 +104,14 @@ For API changes:
 - [ ] No unresolved gaps that should block implementation
 - [ ] User input requested where appropriate
 
+#### Check 8: Goal-Backward Verification (Wave 4)
+- [ ] All services have `status: passed` in VERIFICATION.md
+- [ ] No `gaps_found` status without a clear remediation plan
+- [ ] `human_needed` items have been presented to the user
+- [ ] Cross-service artifacts are wired correctly (verified by each service agent)
+- [ ] Score is acceptable (recommend >80% must-haves verified)
+- [ ] No regressions in re-verification mode
+
 ### 4. Write Review Report
 
 Create `agentbus-orchestrator/{feature-slug}/REVIEW.md`:
@@ -115,11 +128,11 @@ Review Date: YYYY-MM-DD
 
 ## Service Status
 
-| Service | Plan Status | QA Status | Blockers | Open Questions |
-|---------|-------------|-----------|----------|----------------|
-| svc1 | ✅ ready | ✅ clear | None | 0 |
-| svc2 | ⚠️ needs_work | ⚠️ concerns | Cache invalidation | 1 |
-| svc3 | ❌ blocked | ❌ gaps | Missing migration | 0 |
+| Service | Plan Status | QA Status | Verification | Blockers | Open Questions |
+|---------|-------------|-----------|--------------|----------|----------------|
+| svc1 | ✅ ready | ✅ clear | ✅ passed | None | 0 |
+| svc2 | ⚠️ needs_work | ⚠️ concerns | ⚠️ gaps_found | Cache invalidation | 1 |
+| svc3 | ❌ blocked | ❌ gaps | ❌ failed | Missing migration | 0 |
 
 ## Consistency Checks
 
@@ -136,6 +149,12 @@ Review Date: YYYY-MM-DD
 ### QA Concerns (Wave 2.5)
 - [ ] svc2: High-severity concern about race condition not addressed in PLAN.md
 - [x] svc1: All concerns resolved or accepted
+
+### Goal-Backward Verification (Wave 4)
+- [x] svc1: All must-haves verified (5/5)
+- [ ] svc2: 3/5 must-haves verified — gaps in artifact wiring
+  - `src/api/analytics.py` → `src/services/analytics.py` link NOT_WIRED
+- [ ] svc3: 1/5 must-haves verified — multiple MISSING artifacts
 
 ## Critical Issues
 1. **svc3 blocked**: Missing database migration plan
@@ -205,6 +224,10 @@ You:
 **If QA-REPORT.md missing for a service**:
 - Mark as warning
 - Recommend: "Re-run Wave 2.5 for {service}"
+
+**If VERIFICATION.md missing for a service**:
+- Mark as error
+- Recommend: "Re-run Wave 4 for {service}"
 
 **If PLAN.md is empty/malformed**:
 - Mark as error
