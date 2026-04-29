@@ -344,10 +344,289 @@ write_file(output.plan, new_plan)
 ### Mode: `verification` (Wave 4)
 
 **Base Behavior**:
-1. Read CHANGES.md
-2. Run full test suite
-3. Verify against PLAN.md
-4. Write TEST-RESULTS.md
+1. Read PLAN.md (extract must_haves if present)
+2. Read CHANGES.md (what was modified)
+3. Run full test suite
+4. Perform goal-backward verification (3 levels)
+5. Write VERIFICATION.md (primary output)
+6. Write TEST-RESULTS.md (secondary output)
+
+---
+
+### Goal-Backward Verification Process
+
+**Task Completion ≠ Goal Achievement.** A test can pass while the feature doesn't actually work. Verify that the goal was achieved, not just that tasks were marked complete.
+
+#### Step 0: Check for Previous Verification
+
+Before starting fresh, check if a previous VERIFICATION.md exists:
+
+```bash
+cat "{service}/.agentbus-plans/{plan-id}/VERIFICATION.md" 2>/dev/null
+```
+
+**If previous verification exists with `gaps:` section → RE-VERIFICATION MODE:**
+1. Parse previous VERIFICATION.md frontmatter
+2. Extract `must_haves` (truths, artifacts, key_links)
+3. Extract `gaps` (items that failed)
+4. Set `is_re_verification = true`
+5. **Skip to Step 3** (verify truths) with this optimization:
+   - **Failed items**: Full 3-level verification (exists, substantive, wired)
+   - **Passed items**: Quick regression check (existence + basic sanity only)
+
+**If no previous verification OR no `gaps:` section → INITIAL MODE:**
+Set `is_re_verification = false`, proceed with Step 1.
+
+#### Step 1: Establish Must-Haves
+
+Determine what must be verified.
+
+**Option A: Must-haves in PLAN frontmatter**
+
+Check if PLAN.md has `must_haves` in frontmatter:
+
+```yaml
+---
+must_haves:
+  truths:
+    - "User can see existing messages"
+    - "User can send a message"
+  artifacts:
+    - path: "src/components/Chat.tsx"
+      provides: "Message list rendering"
+  key_links:
+    - from: "Chat.tsx"
+      to: "api/chat"
+      via: "fetch in useEffect"
+---
+```
+
+**Option B: Derive from PLAN.md tasks**
+
+If no must_haves in frontmatter, derive from task `Done` criteria:
+1. State the goal — what the feature must achieve
+2. Derive truths — "What must be TRUE for this goal to be achieved?"
+3. Derive artifacts — "What must EXIST?"
+4. Derive key links — "What must be CONNECTED?"
+
+#### Step 2: Verify Observable Truths
+
+For each truth, determine if the codebase enables it.
+
+**Verification status:**
+- ✓ VERIFIED: All supporting artifacts pass all checks
+- ✗ FAILED: One or more artifacts missing, stub, or unwired
+- ? UNCERTAIN: Can't verify programmatically (needs human)
+
+#### Step 3: Verify Artifacts (Three Levels)
+
+For each required artifact, verify three levels:
+
+**Level 1: Existence**
+- Does the file exist?
+- Status: EXISTS | MISSING
+
+**Level 2: Substantive**
+- Does the file have real implementation, not a stub?
+- Minimum lines by type:
+  - Component/API route: 10+ lines
+  - Hook/util: 10+ lines
+  - Schema model: 5+ lines
+- Check for stub patterns: `TODO`, `FIXME`, `placeholder`, `not implemented`, `return null`, `return {}`
+- Status: SUBSTANTIVE | STUB | PARTIAL
+
+**Level 3: Wired**
+- Is the artifact connected to the system?
+- Is it imported and used?
+- Status: WIRED | ORPHANED | PARTIAL
+
+**Final Artifact Status Matrix:**
+
+| Exists | Substantive | Wired | Status |
+|--------|-------------|-------|--------|
+| ✓ | ✓ | ✓ | ✓ VERIFIED |
+| ✓ | ✓ | ✗ | ⚠️ ORPHANED |
+| ✓ | ✗ | - | ✗ STUB |
+| ✗ | - | - | ✗ MISSING |
+
+#### Step 4: Verify Key Links
+
+Check critical connections between artifacts:
+
+**Pattern: Component → API**
+- Does the component call the API endpoint?
+- Is the response used (not just fetched)?
+
+**Pattern: API → Database**
+- Does the route query the expected model?
+- Is the result returned in the response?
+
+**Pattern: Form → Handler**
+- Does the form have an onSubmit handler?
+- Does the handler make an actual API call (not just log)?
+
+**Pattern: State → Render**
+- Does state variable exist?
+- Is it rendered in JSX/output?
+
+#### Step 5: Scan for Anti-Patterns
+
+Identify issues in files modified in this plan:
+
+- `TODO` / `FIXME` / `XXX` / `HACK` comments
+- `placeholder` / `coming soon` / `will be here`
+- Empty returns: `return null`, `return {}`, `return []`
+- `console.log` only implementations
+- Console-only error handling
+
+**Severity:**
+- 🛑 Blocker: Prevents goal achievement
+- ⚠️ Warning: Indicates incomplete work
+- ℹ️ Info: Notable but not problematic
+
+#### Step 6: Identify Human Verification Needs
+
+Some things can't be verified programmatically:
+
+- Visual appearance (does it look right?)
+- User flow completion (can you do the full task?)
+- Real-time behavior (WebSocket, SSE updates)
+- External service integration (payments, email)
+- Performance feel (does it feel fast?)
+
+Flag these explicitly in VERIFICATION.md.
+
+#### Step 7: Determine Overall Status
+
+**Status: passed**
+- All truths VERIFIED
+- All artifacts pass level 1-3
+- All key links WIRED
+- No blocker anti-patterns found
+
+**Status: gaps_found**
+- One or more truths FAILED
+- OR artifacts MISSING/STUB
+- OR key links NOT_WIRED
+- OR blocker anti-patterns found
+
+**Status: human_needed**
+- All automated checks pass
+- BUT items flagged for human verification
+
+**Calculate score:**
+```
+score = verified_truths / total_truths
+```
+
+---
+
+### VERIFICATION.md Output Format
+
+Write `{service}/.agentbus-plans/{plan-id}/VERIFICATION.md`:
+
+```markdown
+---
+plan_id: 001-feature
+service: service-name
+verified: YYYY-MM-DDTHH:MM:SSZ
+status: passed|gaps_found|human_needed
+score: N/M must-haves verified
+re_verification:
+  previous_status: gaps_found
+  previous_score: 2/5
+  gaps_closed:
+    - "Truth that was fixed"
+  gaps_remaining: []
+  regressions: []
+gaps:
+  - truth: "Observable truth that failed"
+    status: failed
+    reason: "Why it failed"
+    artifacts:
+      - path: "src/path/to/file.tsx"
+        issue: "What's wrong"
+    missing:
+      - "Specific thing to add/fix"
+human_verification:
+  - test: "What to do"
+    expected: "What should happen"
+    why_human: "Why can't verify programmatically"
+---
+
+# Verification Report: {plan-id} — {service-name}
+
+**Plan Goal:** {goal from PLAN.md}
+**Verified:** {timestamp}
+**Status:** {status}
+**Score:** {N}/{M} must-haves verified
+
+## Observable Truths
+
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | {truth} | ✓ VERIFIED | {evidence} |
+| 2 | {truth} | ✗ FAILED | {what's wrong} |
+
+## Required Artifacts
+
+| Artifact | Expected | Status | Details |
+|----------|----------|--------|---------|
+| `path` | description | status | details |
+
+## Key Link Verification
+
+| From | To | Via | Status | Details |
+|------|----|-----|--------|---------|
+
+## Anti-Patterns Found
+
+| File | Line | Pattern | Severity | Impact |
+|------|------|---------|----------|--------|
+
+## Human Verification Required
+
+{Items needing human testing}
+
+## Gaps Summary
+
+{Narrative summary of what's missing}
+```
+
+### TEST-RESULTS.md Output
+
+Also write `{service}/.agentbus-plans/{plan-id}/TEST-RESULTS.md`:
+
+```markdown
+# Test Results: {plan-id} — {service-name}
+
+**Date:** YYYY-MM-DD
+
+## Test Suite
+
+| Test Type | Passed | Failed | Skipped |
+|-----------|--------|--------|---------|
+| Unit | N | N | N |
+| Integration | N | N | N |
+
+## Coverage
+
+| Metric | Value |
+|--------|-------|
+| Lines | N% |
+| Functions | N% |
+| Branches | N% |
+
+## Cross-Service Compatibility
+
+- [ ] No breaking changes to shared contracts
+- [ ] Database migrations are backward-compatible
+- [ ] API responses match expected schema
+
+## Notes
+
+{Any observations from test execution}
+```
 
 ---
 
@@ -356,11 +635,12 @@ write_file(output.plan, new_plan)
 **For**: Small fixes after verification.
 
 **Base Behavior**:
-1. Read CHANGES.md and TEST-RESULTS.md
-2. Understand the problem
+1. Read CHANGES.md, TEST-RESULTS.md, and VERIFICATION.md
+2. Understand the problem (especially gaps from VERIFICATION.md)
 3. Apply minimal fix
 4. Re-run tests
-5. Append to CHANGES.md
+5. Update VERIFICATION.md (mark gap as closed or add note)
+6. Append to CHANGES.md
 
 **Specific Instructions Must Include**:
 - `problem`: What's broken
