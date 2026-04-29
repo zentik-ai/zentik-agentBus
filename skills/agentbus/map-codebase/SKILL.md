@@ -385,10 +385,43 @@ Write the 5 documents following the templates below.
 - Location: `[path pattern]`
 - Framework: [e.g., Jest, pytest]
 - Mocking: [strategy]
+- Run command: `[command]`
 
 ### Integration Tests
 - Location: `[path pattern]`
 - Database: [approach, e.g., "Test containers"]
+- Run command: `[command]`
+
+### Test Data Setup
+- Factory approach: [e.g., faker, factories, fixtures]
+- Seed data location: `[path]`
+
+### Verifiability Patterns
+
+Document how tests verify outcomes (not just that code runs):
+
+| Pattern | How It Verifies | Example |
+|---------|-----------------|---------|
+| Request/response contract | Asserts status code + body shape | `expect(res.status).toBe(201); expect(res.body).toHaveProperty('id')` |
+| State change | Queries DB before/after | `expect(await db.user.count()).toBe(1)` |
+| Side effect | Checks external call mock | `expect(mockSendEmail).toHaveBeenCalledWith(...)` |
+| Error path | Asserts specific error code/message | `expect(res.body.error).toBe('VALIDATION_FAILED')` |
+
+### Running Tests
+
+```bash
+# Run all tests
+[command]
+
+# Run single test file
+[command]
+
+# Run with coverage
+[command]
+
+# Run in watch mode
+[command]
+```
 
 ---
 
