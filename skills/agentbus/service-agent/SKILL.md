@@ -50,6 +50,129 @@ Your understanding of the codebase starts from `.planning/codebase/` (the 5 docu
 
 ---
 
+## Execution Quality: Context Budget & Deviation Rules
+
+### Context Budget
+
+Your execution quality degrades as context pressure increases. Stop BEFORE quality falls:
+
+| Context Usage | Quality | State |
+|---------------|---------|-------|
+| 0-30% | PEAK | Thorough, comprehensive |
+| 30-50% | GOOD | Confident, solid work |
+| 50-70% | DEGRADING | Efficiency mode begins |
+| 70%+ | POOR | Rushed, minimal — **STOP** |
+
+**Rule**: A single plan execution should complete within ~50% context. If you exceed 50%, pause and return a checkpoint for the orchestrator to spawn a fresh continuation agent.
+
+### Deviation Rules (Auto-Handle During Implementation)
+
+While executing tasks, you WILL discover work not in the plan. Apply these rules automatically:
+
+#### RULE 1: Auto-Fix Bugs
+
+**Trigger**: Code doesn't work as intended (broken behavior, incorrect output, errors)
+
+**Action**: Fix immediately, track in deviations list
+
+**Examples**: Wrong SQL query, logic errors, type errors, null pointer exceptions, broken validation, security vulnerabilities, race conditions
+
+**Process**:
+1. Fix the bug inline
+2. Add/update tests to prevent regression
+3. Verify fix works
+4. Continue task
+5. Track: `[Rule 1 - Bug] [description]`
+
+**No user permission needed.** Bugs must be fixed for correct operation.
+
+#### RULE 2: Auto-Add Missing Critical Functionality
+
+**Trigger**: Code is missing essential features for correctness, security, or basic operation
+
+**Action**: Add immediately, track in deviations list
+
+**Examples**: Missing error handling, no input validation, missing null checks, no auth on protected routes, missing rate limiting, no logging for errors
+
+**Process**:
+1. Add the missing functionality inline
+2. Add tests for the new functionality
+3. Verify it works
+4. Continue task
+5. Track: `[Rule 2 - Missing Critical] [description]`
+
+**No user permission needed.** These are requirements for basic correctness.
+
+#### RULE 3: Auto-Fix Blocking Issues
+
+**Trigger**: Something prevents you from completing current task
+
+**Action**: Fix immediately to unblock, track in deviations list
+
+**Examples**: Missing dependency, wrong types blocking compilation, broken import paths, missing env variable, build config error
+
+**Process**:
+1. Fix the blocking issue
+2. Verify task can now proceed
+3. Continue task
+4. Track: `[Rule 3 - Blocking] [description]`
+
+**No user permission needed.** Can't complete task without fixing blocker.
+
+#### RULE 4: Report Architectural Changes
+
+**Trigger**: Fix/addition requires significant structural modification
+
+**Action**: STOP, return checkpoint for orchestrator/user decision
+
+**Examples**: Adding new database table (not just column), major schema changes, introducing new service layer, switching libraries/frameworks, changing auth approach, adding new infrastructure, breaking API contract changes
+
+**Process**:
+1. STOP current task
+2. Return checkpoint with type `checkpoint:decision`
+3. Include: what you found, proposed change, why needed, impact, alternatives
+4. WAIT for orchestrator to get user decision
+5. Fresh agent continues with decision
+
+**Rule Priority**:
+1. If Rule 4 applies → STOP and return checkpoint
+2. If Rules 1-3 apply → Fix automatically, track for Summary
+3. If genuinely unsure → Apply Rule 4 (return checkpoint)
+
+### Checkpoint Return Format
+
+When you must pause (Rule 4, context budget exceeded, or explicit checkpoint in plan), return:
+
+```json
+{
+  "status": "checkpoint",
+  "checkpoint_type": "human-verify|decision|human-action",
+  "progress": "3/5 tasks complete",
+  "completed_tasks": [
+    {"task": "Task 1 name", "files": ["src/..."]}
+  ],
+  "current_task": "Task 4 name",
+  "reason": "Why paused",
+  "deviations": [
+    "[Rule 1 - Bug] Fixed case-sensitive email uniqueness in src/auth.ts"
+  ],
+  "user_input_needed": "Describe what the user needs to provide"
+}
+```
+
+### Reading PLAN.md Tasks
+
+A well-formed PLAN.md task has four fields. If they exist, use them:
+
+- **Files**: Exact file paths to create/modify
+- **Action**: Specific implementation instructions, including what to avoid and WHY
+- **Verify**: How to prove the task is complete (command, assertion, expected output)
+- **Done**: Acceptance criteria — measurable state of completion
+
+If PLAN.md tasks are vague, apply your own judgment based on `.planning/codebase/CONVENTIONS.md` and report ambiguity in your summary.
+
+---
+
 ## Input Structure
 
 ```json
