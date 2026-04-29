@@ -25,7 +25,7 @@ Use this skill:
 
 ## Limitations
 
-- **Read-only artifacts**: Do not modify REPORT.md or PLAN.md. Only read and report inconsistencies.
+- **Read-only artifacts**: Do not modify any plan artifact (`PLAN.md`, `QA-REPORT.md`, `VERIFICATION.md`, `CHANGES.md`, etc.). Only read and report inconsistencies.
 - **No automatic correction**: Identify problems but do not fix them. Recommend re-running waves.
 - **Dependency on prior waves**: Requires that PLAN.md and QA reports exist. If they don't exist, recommend re-executing the prior wave.
 - **No code execution**: Do not run tests or automatic verifications. Review is documentation-based.

@@ -65,17 +65,17 @@ Cross-service planning system for features that touch **2+ microservices**.
 ```
 /agentbus orchestrator "migrate to async events" payments notifications inventory
 ```
-Creates: `agentbus-orchestrator/001-feature/status.json` + `SEED-PLAN.md`
+Creates: `agentbus-orchestrator/004-feature/status.json` + `SEED-PLAN.md`
 
 ### Continue Waves
 ```
-/agentbus orchestrator --continue 001-feature
+/agentbus orchestrator --continue 004-feature
 ```
 Executes the next wave based on `status.json`.
 
 ### Verify Consistency
 ```
-/agentbus review --feature-slug 001-feature
+/agentbus review --feature-slug 004-feature
 ```
 
 ---
@@ -189,23 +189,43 @@ The orchestrator scans `.agentbus-plans/` in each service to:
 Example: If `003-feature` exists, the new one will be `004-new-feature`.
 
 ### 3. Execute Flow
+
+All wave commands use the same form: `/agentbus orchestrator --continue <plan-id>`.
+
 ```
 # Step 1: Initialize (auto-detects plan number)
 /agentbus orchestrator "feature description" svc1 svc2
 
-# Step 2: Wave 1 (Deep Mapping - 5 documents)
+# Step 2: Wave 1 — Deep Mapping (5 documents)
 /agentbus orchestrator --continue 004-feature-slug
 
-# Step 3: Wave 1.5 (Design Alignment Checkpoint)
-#         Runs automatically, may ask for input
-
-# Step 4: Wave 2 (Plan Refinement)
+# Step 3: Wave 1.5 — Design Alignment
+#         May checkpoint:decision if conflicts with CONVENTIONS.md
 /agentbus orchestrator --continue 004-feature-slug
 
-# Step 5: Wave 2.5 (Plan QA & Concerns — NEW)
+# Step 4: Wave 2 — Plan Refinement
 /agentbus orchestrator --continue 004-feature-slug
 
-# Step 6-N: Continue remaining waves
+# Step 5: Wave 2.5 — Plan QA & Concerns
+#         Consolidates concerns, asks user for input
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 6: Wave 2.6 — Plan Alignment (cross-service consistency)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 7: Wave 3 — Implementation (modifies code, no commits)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 8: Wave 3.5 — Contract Validation (optional, complex features)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 9: Wave 4 — Goal-Backward Verification
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 10: Wave 4b — Adjustments (only if VERIFICATION.md has gaps)
+/agentbus orchestrator --continue 004-feature-slug
+
+# Step 11: Wave 5 — Wrap-up (creates commits, never pushes)
 /agentbus orchestrator --continue 004-feature-slug
 ```
 

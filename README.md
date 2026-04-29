@@ -10,15 +10,15 @@ Instead of accumulating state in memory, AgentBus writes artifacts at each stage
 
 ```
 Wave 1:   Service Mapping          →  .planning/codebase/ (5 docs per service)
-Wave 1.5: Design Alignment         →  Validated approach decisions
-Wave 2:   Plan Refinement          →  PLAN.md (plan the change)
+Wave 1.5: Design Alignment         →  DESIGN-ALIGNMENT.md per service + validated decisions
+Wave 2:   Plan Refinement          →  PLAN.md (with task anatomy + must_haves)
 Wave 2.5: Plan QA & Concerns       →  QA-REPORT.md (surface gaps for user input)
 Wave 2.6: Plan Alignment           →  Cross-service consistency check
-Wave 3:   Implementation           →  Code modified (no commits yet)
+Wave 3:   Implementation           →  Code + CHANGES.md (deviation rules apply)
 Wave 3.5: Contract Validation      →  Deep implementation check (optional)
-Wave 4:   Verification             →  TEST-RESULTS.md (verify it works)
-Wave 4b:  Adjustments (opt)        →  Minor fixes + clarifications
-Wave 5:   Wrap-up (opt)            →  Git commits + deployment prep
+Wave 4:   Verification             →  VERIFICATION.md (goal-backward) + TEST-RESULTS.md
+Wave 4b:  Adjustments (opt)        →  Fixes based on VERIFICATION.md gaps
+Wave 5:   Wrap-up (opt)            →  Git commits + COMMITS.md (no push by default)
 ```
 
 Benefits:
@@ -61,14 +61,15 @@ agentbus-skills/
 | Wave | Purpose | Key Output |
 |------|---------|------------|
 | 1 | Map services | `.planning/codebase/` (5 docs) |
-| 1.5 | Validate approaches | Design decisions |
-| 2 | Create plans | `PLAN.md` |
+| 1.5 | Validate approaches against conventions | `DESIGN-ALIGNMENT.md` per service |
+| 2 | Create plans | `PLAN.md` (task anatomy + must_haves) |
 | 2.5 | Surface concerns | `QA-REPORT.md` + user input |
-| 2.6 | Check consistency | Alignment report |
+| 2.6 | Check cross-service consistency | Alignment report |
 | 3 | Implement changes | Modified code + `CHANGES.md` |
-| 4 | Verify with tests | `TEST-RESULTS.md` |
-| 4b | Adjust/fix minor issues | Updated code |
-| 5 | Create commits | Git commits + `COMMITS.md` |
+| 3.5 | Validate contracts (optional) | Validation report |
+| 4 | Goal-backward verification | `VERIFICATION.md` + `TEST-RESULTS.md` |
+| 4b | Adjust/fix gaps | Updated code + re-verification |
+| 5 | Create commits | Git commits + `COMMITS.md` (no push) |
 
 ## Workspace Layout
 
@@ -77,13 +78,13 @@ Your workspace (parent of all service repos):
 ```
 workspace/
 ├── agentbus-orchestrator/        # Orchestrator workspace (not a git repo)
-│   └── 001-feature-slug/
+│   └── 004-feature-slug/
 │       ├── status.json           # Wave tracking
-│       ├── SEED-PLAN.md          # Initial vision
-│       ├── PLAN.md               # Consolidated view
+│       ├── SEED-PLAN.md          # Initial vision (updated by Wave 1.5)
+│       ├── PLAN.md               # Consolidated cross-service view
 │       ├── TEST-PLAN.md          # Cross-service tests
 │       ├── DEPLOY-ORDER.md       # Rollout sequence
-│       └── service-outputs/      # Subagent summaries
+│       └── service-outputs/      # Subagent summaries (JSON)
 │           └── {service}.json
 │
 ├── payments-service/             # Service repo
@@ -95,12 +96,14 @@ workspace/
 │           ├── CONVENTIONS.md
 │           └── CONCERNS.md
 │   └── .agentbus-plans/
-│       └── 001-feature-slug/     # Plan folder
-│           ├── PLAN.md           # Written by Wave 2
-│           ├── QA-REPORT.md      # Written by Wave 2.5
-│           ├── CHANGES.md        # Written by Wave 3
-│           ├── TEST-RESULTS.md   # Written by Wave 4
-│           └── COMMITS.md        # Written by Wave 5 (optional)
+│       └── 004-feature-slug/         # Plan folder
+│           ├── DESIGN-ALIGNMENT.md   # Written by Wave 1.5
+│           ├── PLAN.md               # Written by Wave 2
+│           ├── QA-REPORT.md          # Written by Wave 2.5
+│           ├── CHANGES.md            # Written by Wave 3
+│           ├── VERIFICATION.md       # Written by Wave 4 (goal-backward)
+│           ├── TEST-RESULTS.md       # Written by Wave 4 (test suite)
+│           └── COMMITS.md            # Written by Wave 5 (optional)
 │
 └── notifications-service/
     └── ... (same structure)
@@ -248,16 +251,38 @@ Each subagent:
 
 The orchestrator will ask for confirmation before proceeding.
 
-#### Wave 4 — Verification
+#### Wave 4 — Verification (Goal-Backward)
 
 ```bash
 /agentbus orchestrator --continue 004-remove-field
 ```
 
+Wave 4 verifies that the **goal was achieved**, not just that tasks were marked complete. A test can pass while the feature still doesn't work — Wave 4 catches that.
+
 Each subagent:
-- Reads `CHANGES.md` from its service
-- Runs tests
-- Writes `TEST-RESULTS.md` with results
+- Reads `PLAN.md` (`must_haves` frontmatter), `CHANGES.md`, and source code
+- Performs three-level artifact verification: **Exists → Substantive → Wired**
+- Verifies key links (Component → API, API → Database, Form → Handler, State → Render)
+- Scans for anti-patterns (`TODO`, `return null`, console-only error handling)
+- Writes `VERIFICATION.md` with structured gaps and `status: passed | gaps_found | human_needed`
+- Writes `TEST-RESULTS.md` with the test suite output
+
+If `VERIFICATION.md` reports gaps, Wave 4b applies fixes and Wave 4 re-runs in **re-verification mode** (full check on failed items, regression check on passed items).
+
+#### Wave 5 — Wrap-up (Optional)
+
+```bash
+/agentbus orchestrator --continue 004-remove-field
+```
+
+Pre-flight gate: every service must have `VERIFICATION.md` `status: passed`. If any service still has gaps, Wave 5 aborts and recommends Wave 4b.
+
+Each subagent:
+- Reads `VERIFICATION.md`, `CHANGES.md`, `PLAN.md`
+- Stages and commits per `commit_strategy` (default: `per_task`, conventional-commits)
+- Writes `COMMITS.md` with hashes, branch, and push status (always `false` — push is a separate user action)
+
+⚠️ **Wave 5 never pushes**, never uses `--force`, and never bypasses pre-commit hooks.
 
 ### Review
 
@@ -282,12 +307,13 @@ Each service writes the following inside `{service}/.agentbus-plans/{plan-id}/`:
 
 | Artifact | Wave | Contents |
 |----------|------|----------|
-| `PLAN.md` | 2 | Files to modify, approach, dependencies, rollback plan |
+| `DESIGN-ALIGNMENT.md` | 1.5 | Per-decision: recommended approach, alternatives, conflict severity |
+| `PLAN.md` | 2 | Files to modify, task anatomy (Files/Action/Verify/Done), `must_haves` |
 | `QA-REPORT.md` | 2.5 | Concerns (severity), gaps, questions for the user, recommendations |
-| `CHANGES.md` | 3 | Log of files modified during implementation |
-| `VERIFICATION.md` | 4 | Goal-backward verification with structured gaps |
-| `TEST-RESULTS.md` | 4 | Test suite results |
-| `COMMITS.md` | 5 (opt) | Commit log written after wrap-up |
+| `CHANGES.md` | 3 | Log of files modified during implementation (with deviation tracking) |
+| `VERIFICATION.md` | 4 | Goal-backward verification with structured gaps and `status` |
+| `TEST-RESULTS.md` | 4 | Test suite results (passed/failed/coverage) |
+| `COMMITS.md` | 5 (opt) | Commit hashes + branch state (never pushed by the agent) |
 
 ### Cross-Service Verification
 
@@ -298,13 +324,14 @@ Two layers of cross-service verification run during the flow:
 
 ### Final Review (`/agentbus review`)
 
-Run after Wave 4. Reads `PLAN.md`, `QA-REPORT.md`, and `TEST-RESULTS.md` from every service and verifies:
+Run after Wave 4. Reads `PLAN.md`, `QA-REPORT.md`, `VERIFICATION.md`, and `TEST-RESULTS.md` from every service and verifies:
 - Plan completeness (no missing artifacts)
 - Dependency mirroring (A depends on B → B acknowledges A)
 - API contract consistency between producer and consumer
 - Sequencing coherence (no circular deploy order)
 - Question ownership (every open question has an owner and blocking status)
 - High-severity QA concerns are resolved in the final plan
+- Every service has `VERIFICATION.md` with `status: passed` (no unresolved gaps)
 
 ## Adding Services Mid-Flight
 
