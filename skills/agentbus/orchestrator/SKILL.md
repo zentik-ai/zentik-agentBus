@@ -101,15 +101,78 @@ When a service agent returns `status: "checkpoint"`:
 
 ```
 Wave 1:   Service Mapping         →  .planning/codebase/ (5 docs via map-codebase)
-Wave 1.5: Design Alignment        →  Validated approach decisions
+Wave 1.5: Design Alignment        →  DESIGN-ALIGNMENT.md per service + validated decisions
 Wave 2:   Plan Refinement         →  PLAN.md
 Wave 2.5: Plan QA & Concerns      →  QA-REPORT.md per service + user input
 Wave 2.6: Plan Alignment          →  Batch 1: High-level consistency (PLAN.md)
 Wave 3:   Implementation          →  Code modified (no commits)
 Wave 3.5: Contract Validation     →  Batch 2: Deep consistency (code) - Optional
 Wave 4:   Verification            →  VERIFICATION.md (primary) + TEST-RESULTS.md
-Wave 5:   Wrap-up (optional)      →  Git commits + final deployment prep
+Wave 4b:  Quick Fix & Adjustments →  Updated CHANGES.md + re-verification
+Wave 5:   Wrap-up (optional)      →  Git commits + COMMITS.md (no push by default)
 ```
+
+### Wave 1.5: Design Alignment
+
+**Purpose**: Validate that the approaches proposed in `SEED-PLAN.md` align with each service's available conventions, BEFORE writing detailed plans.
+
+**Why**: Catches design conflicts early (e.g., "seed plan wants to add a column via API, but the service uses SQL migrations for schema changes"). Fixing in Wave 1.5 is cheap; fixing in Wave 3 is expensive.
+
+**What happens**:
+1. Orchestrator spawns parallel specialist agents in `design_alignment` mode (one per service)
+2. Each agent reads its `.planning/codebase/CONVENTIONS.md` + `ARCHITECTURE.md` + the `SEED-PLAN.md`
+3. Each agent writes `DESIGN-ALIGNMENT.md` with:
+   - Per decision in seed plan: recommended approach (per service conventions), alternatives, conflict severity
+4. Orchestrator consolidates and presents conflicts to the user as `checkpoint:decision`
+5. User picks an approach per conflict (or accepts all recommendations)
+6. Orchestrator updates `SEED-PLAN.md` (or appends an `# Approved Approaches` section) so Wave 2 starts from validated decisions
+
+**Output**: `{service}/.agentbus-plans/{plan-id}/DESIGN-ALIGNMENT.md`
+
+**Heuristics applied** (specialist agents follow these by default):
+
+| Scenario | Preferred Approach |
+|----------|-------------------|
+| Schema change (ALTER TABLE, new column) | SQL Migration |
+| Dynamic data (permissions, configs) | API Endpoint |
+| Per-environment data | API/Config |
+| Static reference data | Migration/Seed |
+| Cross-cutting concern (logging, auth) | Middleware |
+
+If the seed plan conflicts with a service's convention, the agent reports a conflict with severity (`high` / `medium` / `low`).
+
+**UI Example**:
+
+```
+═══════════════════════════════════════════════════════════════
+  WAVE 1.5: DESIGN ALIGNMENT
+═══════════════════════════════════════════════════════════════
+
+Services validated: payments-service, notifications-service
+
+🔴 1 high-severity design conflict
+🟡 2 medium-severity design conflicts
+
+Conflict 1 (HIGH):
+  [payments-service] Seed plan proposes adding `audit_log` column
+                     via API endpoint.
+                     Convention requires SQL migration for schema
+                     changes (see CONVENTIONS.md decision matrix).
+                     Recommended: Use Prisma migration in
+                     prisma/migrations/.
+
+Options:
+  [a] Accept all recommended approaches
+  [m] Manual — choose per conflict
+  [v] View full DESIGN-ALIGNMENT.md per service
+  [s] Skip — Proceed to Wave 2 with seed plan as-is (risky)
+
+Your choice: _
+```
+
+If all services return `conflicts: []`, the orchestrator can skip the user prompt and proceed silently to Wave 2.
+
+---
 
 ### Wave 2.5: Plan QA & Concerns — NEW
 
@@ -441,6 +504,54 @@ Task(
     readonly=False
 )
 ```
+
+### Wave 1.5: Design Alignment
+
+```python
+# 1. Spawn parallel design-alignment agents
+for service in services:
+    Task(
+        subagent_name="agentbus service agent",
+        description=f"Wave 1.5: Validate design for {service}",
+        prompt=json.dumps({
+            "wave": 1.5,
+            "service": {"name": service, "path": f"/workspace/{service}"},
+            "mode": "design_alignment",
+            "base_context": {
+                "codebase_dir": f"/workspace/{service}/.planning/codebase",
+                "seed_plan": f"/workspace/orchestrator/{plan_id}/SEED-PLAN.md"
+            },
+            "instructions": {
+                "identify_conflicts": True,
+                "suggest_alternatives": True
+            },
+            "output": {
+                "design_alignment": f"/workspace/{service}/.agentbus-plans/{plan_id}/DESIGN-ALIGNMENT.md",
+                "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-design.json"
+            }
+        }),
+        readonly=False
+    )
+
+# 2. Consolidate conflicts from all summaries
+conflicts = []
+for service in services:
+    summary = read_file(
+        f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-design.json"
+    )
+    conflicts.extend(parse(summary)["conflicts"])
+
+# 3. If high-severity conflicts exist, prompt user; otherwise proceed silently
+if any(c["severity"] == "high" for c in conflicts):
+    decisions = present_to_user(
+        conflicts,
+        checkpoint_type="checkpoint:decision"
+    )
+    # 4. Append approved approaches to SEED-PLAN so Wave 2 reads validated state
+    append_approved_approaches(seed_plan_path, decisions)
+```
+
+---
 
 ### Wave 2: Plan Refinement (Standard)
 
@@ -822,6 +933,111 @@ Task(
 - `checkpoint:decision`: "The fix reveals a deeper issue. Two options: [A] quick patch [B] proper refactor. Which one?"
 - `checkpoint:human-action`: "The fix requires a manual database migration. Please run `npx prisma migrate dev` and type 'done'."
 
+---
+
+### Wave 5: Wrap-up (Optional)
+
+**Purpose**: Create git commits with descriptive messages once verification has passed.
+
+**Pre-flight gate**: Wave 5 MUST NOT run unless every service has `VERIFICATION.md` with `status: passed`. Abort otherwise.
+
+**Critical safety rules** (the orchestrator enforces, the service agent obeys):
+
+- ❌ Never push to remote without explicit user confirmation
+- ❌ Never use `--force`, `--no-verify`, or skip pre-commit hooks
+- ❌ Never amend commits already pushed
+- ❌ Never commit if `VERIFICATION.md` status ≠ `passed`
+- ✅ Each service commits its own changes locally only
+- ✅ Push and PR creation are separate user actions, out of scope for v3
+
+**What happens**:
+1. Orchestrator reads every `VERIFICATION.md` and checks `status: passed`
+2. If any service is not passed, abort and recommend Wave 4b
+3. Orchestrator presents a `checkpoint:human-verify` summary to the user before commits
+4. User confirms → orchestrator spawns parallel `wrap_up` agents (one per service)
+5. Each agent writes one or more commits and a `COMMITS.md` log
+6. Orchestrator consolidates and reports commit hashes back to the user
+
+**Output**: `{service}/.agentbus-plans/{plan-id}/COMMITS.md`
+
+```python
+# Wave 5: Wrap-up
+
+# 1. Pre-flight: every service must have passed Wave 4
+for service in services:
+    verification = read_file(
+        f"/workspace/{service}/.agentbus-plans/{plan_id}/VERIFICATION.md"
+    )
+    status = parse_frontmatter(verification)["status"]
+    if status != "passed":
+        abort(
+            f"[{service}] Wave 4 status is '{status}', not 'passed'. "
+            f"Resolve via Wave 4b before Wave 5."
+        )
+
+# 2. Confirm with user (checkpoint:human-verify)
+present_to_user(
+    f"Ready to commit changes across {len(services)} services. "
+    f"Each service will create commits locally (NOT push). Confirm?",
+    checkpoint_type="checkpoint:human-verify"
+)
+
+# 3. Spawn wrap_up agents in parallel
+for service in services:
+    Task(
+        subagent_name="agentbus service agent",
+        description=f"Wave 5: Wrap up {service}",
+        prompt=json.dumps({
+            "wave": 5,
+            "service": {"name": service, "path": f"/workspace/{service}"},
+            "mode": "wrap_up",
+            "base_context": {
+                "plan": f"/workspace/{service}/.agentbus-plans/{plan_id}/PLAN.md",
+                "changes_log": f"/workspace/{service}/.agentbus-plans/{plan_id}/CHANGES.md",
+                "verification": f"/workspace/{service}/.agentbus-plans/{plan_id}/VERIFICATION.md"
+            },
+            "instructions": {
+                "commit_strategy": "per_task",  # or "single", "per_layer"
+                "message_format": "conventional-commits",
+                "no_push": True,
+                "no_amend": True
+            },
+            "output": {
+                "commits": f"/workspace/{service}/.agentbus-plans/{plan_id}/COMMITS.md",
+                "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-commits.json"
+            }
+        }),
+        readonly=False
+    )
+
+# 4. Consolidate and report
+for service in services:
+    summary = read_file(
+        f"/workspace/orchestrator/{plan_id}/service-outputs/{service}-commits.json"
+    )
+    report_commits_to_user(service, summary)
+```
+
+**UI Example after Wave 5**:
+
+```
+═══════════════════════════════════════════════════════════════
+  WAVE 5: WRAP-UP COMPLETE
+═══════════════════════════════════════════════════════════════
+
+[payments-service] 2 commits on branch feat/004-audit-logging
+  abc1234  feat(audit): add audit_log column to Payment model
+  def5678  feat(audit): record payment events in audit_log
+
+[notifications-service] 1 commit on branch feat/004-audit-logging
+  9876fed  feat(audit): subscribe to audit_log events
+
+⚠️  None of these commits have been pushed.
+   To push:  cd <service> && git push -u origin HEAD
+```
+
+**If `commit_strategy` is unclear**, default to `per_task` (one commit per task in PLAN.md). This produces a clean history aligned with the plan structure.
+
 ### Custom Scenario: Refactor Error Handling
 
 ```python
@@ -887,6 +1103,16 @@ This prevents context loss when discussing multiple services.
   "current_wave": 2.5,
   "waves": {
     "wave_1_mapping": {"status": "completed"},
+    "wave_1_5_design_alignment": {
+      "status": "completed",
+      "conflicts_resolved": 3,
+      "user_decisions": [
+        {
+          "decision": "How to add audit_log column",
+          "approved": "Prisma migration"
+        }
+      ]
+    },
     "wave_2_refinement": {
       "status": "completed",
       "adjustments": [
@@ -898,10 +1124,24 @@ This prevents context loss when discussing multiple services.
       ]
     },
     "wave_2_5_qa": {"status": "completed"},
-    "wave_3_implementation": {"status": "pending"}
+    "wave_2_6_alignment": {"status": "completed"},
+    "wave_3_implementation": {"status": "pending"},
+    "wave_3_5_contract_validation": {"status": "skipped"},
+    "wave_4_verification": {
+      "status": "pending",
+      "is_re_verification": false
+    },
+    "wave_4b_adjustments": {"status": "not_started"},
+    "wave_5_wrap_up": {
+      "status": "not_started",
+      "pre_flight_passed": null,
+      "pushed": false
+    }
   }
 }
 ```
+
+**Wave statuses**: `not_started` | `pending` | `in_progress` | `completed` | `failed` | `skipped` | `blocked`
 
 ---
 

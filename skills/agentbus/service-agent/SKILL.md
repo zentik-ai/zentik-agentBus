@@ -232,6 +232,92 @@ write_file(output.summary, summary_json)
 
 ---
 
+### Mode: `design_alignment` (Wave 1.5)
+
+**Purpose**: Validate that the proposed approaches in `SEED-PLAN.md` align with this service's available conventions, BEFORE writing a detailed plan.
+
+**Base Behavior**:
+1. Read `.planning/codebase/CONVENTIONS.md` (decision matrix and patterns)
+2. Read `.planning/codebase/ARCHITECTURE.md` (structural constraints)
+3. Read `SEED-PLAN.md` (proposed approach from the user)
+4. For each significant decision implied by the seed plan:
+   - Identify the recommended approach per `CONVENTIONS.md`
+   - List alternatives available in this codebase
+   - Detect conflicts between seed plan and conventions
+5. Write `DESIGN-ALIGNMENT.md` with the findings
+6. Return a structured summary with conflicts list
+
+**Conflict severity**:
+- `high`: Seed plan proposes something unsupported or that violates a hard constraint (e.g., schema change via API when convention is migration-only)
+- `medium`: Seed plan proposes a non-preferred but workable approach
+- `low`: Stylistic deviation, no functional impact
+
+**Default heuristics** (apply when `CONVENTIONS.md` provides a decision matrix):
+
+| Scenario | Preferred Approach |
+|----------|-------------------|
+| Schema change (ALTER TABLE, new column) | SQL Migration |
+| Dynamic data (permissions, configs) | API Endpoint |
+| Per-environment data | API/Config |
+| Static reference data | Migration/Seed |
+| Cross-cutting concern (logging, auth) | Middleware |
+
+**DESIGN-ALIGNMENT.md output format**:
+
+```markdown
+---
+service: payments-service
+plan_id: 004-feature
+analyzed_at: YYYY-MM-DDTHH:MM:SSZ
+conflict_count: {high: 1, medium: 2, low: 0}
+---
+
+# Design Alignment: 004-feature — payments-service
+
+## Decisions Reviewed
+
+### Decision 1: How to add `audit_log` column to Payment model
+
+- **Seed plan proposal**: Add via API endpoint
+- **Service convention** (CONVENTIONS.md §Data Modification): Schema changes use SQL migrations
+- **Conflict severity**: 🔴 HIGH
+- **Recommended**: Add `prisma/migrations/YYYYMMDD_add_audit_log/migration.sql`
+- **Alternatives**:
+  - Computed virtual field (no DB change, runtime-only)
+  - JSON column with embedded audit (less queryable)
+
+### Decision 2: Where to put audit logging logic
+
+- **Seed plan proposal**: Inline in handler
+- **Service convention**: Cross-cutting concerns go in middleware
+- **Conflict severity**: 🟡 MEDIUM
+- **Recommended**: New `src/middleware/auditMiddleware.ts`
+```
+
+**Summary JSON additions** (returned to orchestrator):
+
+```json
+{
+  "wave": 1.5,
+  "mode": "design_alignment",
+  "status": "completed",
+  "artifacts_written": ["DESIGN-ALIGNMENT.md"],
+  "conflicts": [
+    {
+      "severity": "high",
+      "decision": "How to add audit_log column",
+      "seed_proposal": "API endpoint",
+      "recommended": "Prisma migration",
+      "rationale": "CONVENTIONS.md §Data Modification mandates migrations for schema changes"
+    }
+  ]
+}
+```
+
+If `conflicts: []`, the orchestrator can skip user prompting and proceed silently to Wave 2.
+
+---
+
 ### Mode: `plan_qa` (Wave 2.5) — NEW
 
 **Purpose**: Identify concerns, gaps, and doubts in the plan before implementation.
@@ -660,6 +746,138 @@ Also write `{service}/.agentbus-plans/{plan-id}/TEST-RESULTS.md`:
 
 ---
 
+### Mode: `wrap_up` (Wave 5)
+
+**Purpose**: Create git commits with descriptive messages after Wave 4 verification has passed.
+
+**Critical Safety Rules** (orchestrator enforces, you obey — never override):
+
+- ❌ NEVER push to remote
+- ❌ NEVER use `--force`, `--no-verify`, or skip pre-commit hooks
+- ❌ NEVER amend commits (especially not amend ones already pushed)
+- ❌ NEVER commit if `VERIFICATION.md` `status` is not `passed`
+- ❌ NEVER commit secrets, credentials, or `.env` files
+- ✅ Only commit files listed in `CHANGES.md`
+- ✅ Use HEREDOC for multi-line commit messages
+
+**Pre-flight Check (FAIL FAST)**:
+
+```bash
+# Read VERIFICATION.md frontmatter
+verification_status=$(parse_frontmatter "{verification}" "status")
+
+if [ "$verification_status" != "passed" ]; then
+    echo '{"status":"failed","error":"VERIFICATION.md status is not passed","recommendation":"Resolve gaps via Wave 4b first"}'
+    exit 1
+fi
+```
+
+**Base Behavior**:
+1. Read `VERIFICATION.md` — abort if `status` ≠ `passed`
+2. Read `CHANGES.md` to determine which files were modified
+3. Read `PLAN.md` for commit message context (task names, goal)
+4. Group files into logical commits per `commit_strategy`
+5. Stage and commit each group
+6. Write `COMMITS.md` with hashes, messages, and branch state
+7. DO NOT push
+
+**Specific Instructions May Include**:
+
+- `commit_strategy`: `"single"` | `"per_task"` | `"per_layer"` (default: `per_task`)
+- `message_format`: `"conventional-commits"` | `"freeform"` (default: `conventional-commits`)
+- `co_author`: optional `"Co-authored-by: Name <email>"` line to append
+- `branch_name`: optional explicit branch (else use current)
+
+**Commit message template** (conventional-commits):
+
+```
+<type>(<scope>): <short summary>
+
+<body explaining what and why, not how>
+
+Refs: PLAN.md task <N>
+```
+
+Where `type` is one of: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `style`.
+
+**COMMITS.md output format**:
+
+```markdown
+---
+service: payments-service
+plan_id: 004-feature
+branch: feat/004-audit-logging
+strategy: per_task
+committed_at: YYYY-MM-DDTHH:MM:SSZ
+pushed: false
+---
+
+# Commits: 004-feature — payments-service
+
+## Summary
+
+- Strategy: `per_task`
+- Branch: `feat/004-audit-logging`
+- Total commits: 2
+- Pushed: ❌ No (push manually after review)
+
+## Commits
+
+### 1. `abc1234` — feat(audit): add audit_log column to Payment model
+
+- **Files**: `prisma/migrations/20260428_add_audit_log/migration.sql`
+- **Plan reference**: Task 1
+- **Body**: Adds nullable `audit_log` JSONB column to support per-event audit trail. Migration is backward-compatible (no data migration required).
+
+### 2. `def5678` — feat(audit): record payment events in audit_log
+
+- **Files**: `src/services/payments.ts`, `src/services/audit.ts`
+- **Plan reference**: Tasks 2-3
+- **Body**: Hooks audit recording into payment lifecycle (create, refund, capture). Uses centralized `recordAuditEvent` to keep call sites consistent.
+
+## Branch Status
+
+- Local commits ahead of `origin/main`: 2
+- Pushed: ❌ No
+- Push command: `git push -u origin feat/004-audit-logging`
+```
+
+**Failure modes** (return `status: failed` and DO NOT commit):
+
+| Condition | Action |
+|-----------|--------|
+| `VERIFICATION.md` status ≠ `passed` | Abort with recommendation to run Wave 4b |
+| `CHANGES.md` is empty | Abort — nothing to commit |
+| Working tree has files not in `CHANGES.md` | Abort — flag unexpected changes for user review |
+| Pre-commit hook fails | Do NOT use `--no-verify`. Report failure with hook output. User must fix or explicitly approve a new attempt |
+| Commit message rejected by commit-msg hook | Same — fix the message, do NOT bypass |
+
+**Example Input**:
+
+```json
+{
+  "wave": 5,
+  "mode": "wrap_up",
+  "base_context": {
+    "plan": "/workspace/payments-service/.agentbus-plans/004-feature/PLAN.md",
+    "changes_log": "/workspace/payments-service/.agentbus-plans/004-feature/CHANGES.md",
+    "verification": "/workspace/payments-service/.agentbus-plans/004-feature/VERIFICATION.md"
+  },
+  "instructions": {
+    "commit_strategy": "per_task",
+    "message_format": "conventional-commits",
+    "no_push": true,
+    "no_amend": true
+  },
+  "output": {
+    "commits": "/workspace/payments-service/.agentbus-plans/004-feature/COMMITS.md",
+    "summary": "/workspace/orchestrator/004-feature/service-outputs/payments-service-commits.json"
+  }
+}
+```
+
+---
+
 ### Mode: `context_query` (Wave 2b)
 
 **For**: Gathering info from other services.
@@ -824,7 +1042,7 @@ write_file(output["summary"], summary_json)
 {
   "status": "failed",
   "error": "Unknown mode: {mode}",
-  "supported_modes": ["plan_refinement", "plan_qa", "adjustment", "implementation", "verification", "quick_fix", "context_query", "custom"]
+  "supported_modes": ["design_alignment", "plan_refinement", "plan_qa", "adjustment", "implementation", "verification", "quick_fix", "wrap_up", "context_query", "custom"]
 }
 ```
 
