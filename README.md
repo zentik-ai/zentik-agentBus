@@ -265,8 +265,8 @@ Each subagent:
 /agentbus review --feature-slug "004-remove-field"
 ```
 
-Reads all `PLAN.md`, `QA-REPORT.md`, and `TEST-RESULTS.md` files and checks:
-- All services pass tests
+Reads all `PLAN.md`, `QA-REPORT.md`, `VERIFICATION.md`, and `TEST-RESULTS.md` files and checks:
+- All services pass goal-backward verification (`status: passed`)
 - Cross-service dependencies are mirrored
 - API contracts are consistent
 - Deploy order is coherent
@@ -285,7 +285,8 @@ Each service writes the following inside `{service}/.agentbus-plans/{plan-id}/`:
 | `PLAN.md` | 2 | Files to modify, approach, dependencies, rollback plan |
 | `QA-REPORT.md` | 2.5 | Concerns (severity), gaps, questions for the user, recommendations |
 | `CHANGES.md` | 3 | Log of files modified during implementation |
-| `TEST-RESULTS.md` | 4 | Test summary, coverage, cross-service compatibility checks |
+| `VERIFICATION.md` | 4 | Goal-backward verification with structured gaps |
+| `TEST-RESULTS.md` | 4 | Test suite results |
 | `COMMITS.md` | 5 (opt) | Commit log written after wrap-up |
 
 ### Cross-Service Verification

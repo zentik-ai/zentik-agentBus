@@ -92,7 +92,7 @@ Executes the next wave based on `status.json`.
 | 2b | Context Queries | Answers | Query adjacent services |
 | 3 | Implementation | Code + `CHANGES.md` | Modify code (no commits) |
 | 3.5 | Contract Validation | Validation report | Deep implementation check (optional) |
-| 4 | Verification | `TEST-RESULTS.md` | Run tests |
+| 4 | Verification | `VERIFICATION.md` + `TEST-RESULTS.md` | Goal-backward verification (3 levels) |
 | 4b | Adjustments (opt) | Fixes / explanations | Minor fixes and clarifications |
 | 5 | Wrap-up (opt) | `COMMITS.md` | Post-verification commits |
 

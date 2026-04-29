@@ -167,15 +167,19 @@ Runs the next wave based on `status.json`.
 
 ### Wave 4: Verification
 
-**Purpose**: Verify implementation works
+**Purpose**: Verify the goal was achieved, not just that tasks completed
 
 **What happens:**
-- Subagents read CHANGES.md
+- Subagents read PLAN.md must_haves and CHANGES.md
 - Run full test suite
-- Check cross-service compatibility
-- Write TEST-RESULTS.md
+- Perform goal-backward verification (3 levels: Exists → Substantive → Wired)
+- Scan for anti-patterns (stubs, TODOs, unwired artifacts)
+- Write VERIFICATION.md (primary output) with structured gaps
+- Also write TEST-RESULTS.md (test suite results)
 
-**Output**: `{service}/.agentbus-plans/{plan-id}/TEST-RESULTS.md`
+**Output**:
+- `{service}/.agentbus-plans/{plan-id}/VERIFICATION.md` — goal-backward verification
+- `{service}/.agentbus-plans/{plan-id}/TEST-RESULTS.md` — test results
 
 ### Wave 4b: Adjustments & Clarifications (Optional)
 
