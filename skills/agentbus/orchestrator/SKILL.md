@@ -63,6 +63,95 @@ Task(
 
 ---
 
+## Initialization Protocols
+
+Before any wave runs, the orchestrator resolves paths and assigns a plan ID. Both decisions are sticky for the lifetime of the plan.
+
+### Path Resolution
+
+| Scope | Source | Example |
+|-------|--------|---------|
+| **Service paths** | `~/.agentbus/services.json` (global registry) | `/home/user/repos/payments-service` |
+| **Orchestrator workspace** | `<cwd>/agentbus-orchestrator/<plan-id>/` | `<cwd>` is where the user invoked the command |
+| **Plan folder** | `<service-path>/.agentbus-plans/<plan-id>/` | Inside each participating service repo |
+| **Codebase docs** | `<service-path>/.planning/codebase/` | Written by Wave 1, persists across plans |
+
+**Rules**:
+
+- Service paths are absolute and come ONLY from the registry. The orchestrator never infers paths from `<cwd>`.
+- The orchestrator workspace lives in `<cwd>` — different projects can have different workspaces.
+- The orchestrator workspace is NOT a git repo; advise users to keep it untracked.
+- If a service in the user's prompt is NOT in the registry, abort and instruct the user to register it first.
+
+### Plan Numbering Algorithm
+
+Plans share a sequential numeric prefix across all participating services so the cross-service history stays aligned.
+
+**Algorithm**:
+
+```python
+def suggest_plan_id(services: list[str], slug: str) -> tuple[str, dict]:
+    pattern = re.compile(r"^(\d{3})-")
+    observed_max_per_service = {}
+
+    for service in services:
+        plans_dir = f"{service_path(service)}/.agentbus-plans"
+        if not exists(plans_dir):
+            observed_max_per_service[service] = 0
+            continue
+        numbers = [
+            int(m.group(1))
+            for folder in listdir(plans_dir)
+            if (m := pattern.match(folder))
+        ]
+        observed_max_per_service[service] = max(numbers) if numbers else 0
+
+    global_max = max(observed_max_per_service.values())
+    next_id = f"{global_max + 1:03d}-{slug}"
+
+    anomaly = None
+    if len(set(observed_max_per_service.values())) > 1:
+        anomaly = {
+            "observed_max": observed_max_per_service,
+            "assigned": global_max + 1,
+            "note": "Services had divergent plan counts; aligned to global max + 1"
+        }
+
+    return next_id, anomaly
+```
+
+**User confirmation**: Always present the suggested ID and anomaly (if any) before creating folders:
+
+```
+Suggested plan ID: 009-add-audit-logging
+
+Numbering anomaly detected:
+  payments-service: highest observed = 005
+  notifications-service: highest observed = 008
+  → Aligning all services to 009 to keep history dense.
+
+Confirm? [y/n]
+```
+
+**On confirmation**: write the anomaly (if any) into `status.json` under `numbering_anomaly` for audit purposes.
+
+**Slug conventions**:
+
+- Lowercase, hyphen-separated, 2-5 words
+- ✅ Good: `004-add-audit-logging`, `007-migrate-payments-to-kafka`
+- ❌ Bad: `004-FIX!!!`, `004-temp`, `004-tba`
+
+**Concurrency**: The orchestrator does NOT take locks. If two users initialize plans simultaneously and both pick `009-`, the second to write will collide at folder-creation time. Detection-and-retry is the only mitigation:
+
+1. Try to `mkdir` the plan folder in each service
+2. If any service reports the folder already exists, abort all writes (don't leave half-created plans)
+3. Re-run the numbering algorithm and try the next ID
+4. Bail after 3 retries with a clear error to the user
+
+For solo developers (the v3 target audience) this is acceptable. Multi-user concurrency is out of scope for v3.
+
+---
+
 ## Context Budget & Wave Pacing
 
 Specialist agents degrade in quality as context pressure increases. You must account for this when designing waves.
@@ -578,6 +667,120 @@ Task(
     readonly=False
 )
 ```
+
+### Wave 2 → 2b → Wave 2 retry: needs_context Flow
+
+When a service agent in Wave 2 (or 2.5) discovers it cannot complete its work without information from another service, it returns `status: "needs_context"` in its summary JSON. The orchestrator detects this, runs Wave 2b (context queries) against the target services, and re-spawns the original agent with the answers.
+
+**Step 1: Detect needs_context in the original Wave 2 result**
+
+Service agent returns this in its summary JSON:
+
+```json
+{
+  "wave": 2,
+  "service": "cronjob-api",
+  "status": "needs_context",
+  "upstream_questions": [
+    {"service": "users-api", "question": "What fields does GET /users/{id} return?"},
+    {"service": "users-api", "question": "Is branch_name nested under organization or flat?"},
+    {"service": "billing-api", "question": "What's the schema of the InvoiceCreated event?"}
+  ]
+}
+```
+
+**Step 2: Group questions by target service and validate prerequisites**
+
+```python
+from collections import defaultdict
+
+questions_by_service = defaultdict(list)
+for q in result["upstream_questions"]:
+    questions_by_service[q["service"]].append(q["question"])
+
+# Prerequisite: every target service MUST have .planning/codebase/ from Wave 1.
+# If not, abort and instruct the user to run Wave 1 for that target first.
+for target in questions_by_service.keys():
+    codebase = f"{service_path(target)}/.planning/codebase"
+    if not exists(codebase):
+        abort(
+            f"Cannot run Wave 2b: target service '{target}' has no "
+            f".planning/codebase/. Run Wave 1 for '{target}' first."
+        )
+```
+
+**Step 3: Spawn parallel context_query agents in target services**
+
+```python
+answers = {}
+for target, questions in questions_by_service.items():
+    Task(
+        subagent_name="agentbus service agent",
+        description=f"Wave 2b: Context query in {target}",
+        prompt=json.dumps({
+            "wave": "2b",
+            "service": {"name": target, "path": service_path(target)},
+            "mode": "context_query",
+            "base_context": {
+                "codebase_dir": f"{service_path(target)}/.planning/codebase"
+            },
+            "instructions": {
+                "questions": questions,
+                "asked_by": "cronjob-api",
+                "for_plan": plan_id
+            },
+            "output": {
+                # Note: written to ORCHESTRATOR workspace, NOT to a plan folder
+                # in the target service. Adjacent services don't get plan folders.
+                "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/{target}-context.json"
+            }
+        }),
+        readonly=False
+    )
+    answers[target] = parse(read_file(
+        f"/workspace/orchestrator/{plan_id}/service-outputs/{target}-context.json"
+    ))["answers"]
+```
+
+**Step 4: Re-spawn the original agent with answers in `additional_context`**
+
+```python
+Task(
+    subagent_name="agentbus service agent",
+    description=f"Wave 2 (retry with context): Refine plan for cronjob-api",
+    prompt=json.dumps({
+        "wave": 2,
+        "service": {"name": "cronjob-api", "path": service_path("cronjob-api")},
+        "mode": "plan_refinement",
+        "base_context": {
+            "codebase_dir": f"{service_path('cronjob-api')}/.planning/codebase",
+            "seed_plan": f"/workspace/orchestrator/{plan_id}/SEED-PLAN.md"
+        },
+        "instructions": {
+            "validate_against_conventions": True
+        },
+        "additional_context": {
+            "upstream_answers": answers,
+            "previous_attempt_status": "needs_context",
+            "questions_resolved": True
+        },
+        "output": {
+            "plan": f"{service_path('cronjob-api')}/.agentbus-plans/{plan_id}/PLAN.md",
+            "summary": f"/workspace/orchestrator/{plan_id}/service-outputs/cronjob-api.json"
+        }
+    }),
+    readonly=False
+)
+```
+
+**Constraints**:
+
+- ❌ A `context_query` agent that itself returns `needs_context` (transitive query) is NOT supported in v3. Abort and ask the user to break the dependency manually.
+- ❌ Adjacent services queried via Wave 2b do NOT get a `.agentbus-plans/{plan-id}/` folder. Their answers live only in the orchestrator workspace.
+- ✅ Wave 2b can run multiple times in a single plan if different services have different context needs.
+- ✅ If the same target service is asked questions from multiple source agents, batch them into a single context_query call.
+
+---
 
 ### Wave 2.5: Plan QA & Concerns (NEW)
 

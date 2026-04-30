@@ -181,12 +181,17 @@ After Wave 4 (tests), if there are minor failures or you need clarifications:
 ```
 
 ### 2. Auto-Generated Plan ID
-The orchestrator scans `.agentbus-plans/` in each service to:
-- Find the highest existing plan number
-- Suggest the next sequential number (no gaps)
-- Validate consistency across all services
 
-Example: If `003-feature` exists, the new one will be `004-new-feature`.
+The orchestrator scans `.agentbus-plans/` in each participating service and assigns the next sequential plan ID across all of them:
+
+- Highest observed prefix → `max_observed`
+- Suggested ID → `f"{max_observed + 1:03d}-{slug}"`
+- If services have divergent counts (e.g., svc1 at `005-`, svc2 at `008-`), all get aligned to `009-` and the anomaly is recorded in `status.json`
+- The user always confirms before any folders are created
+
+Full algorithm and concurrency notes: see `agentbus orchestrator/SKILL.md` § Initialization Protocols → Plan Numbering Algorithm.
+
+Example: If `003-feature` exists in every service, the new one will be `004-new-feature`.
 
 ### 3. Execute Flow
 
